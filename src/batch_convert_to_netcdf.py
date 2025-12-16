@@ -1,8 +1,11 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -
+# Imports:
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
 indir = '/Users/danywaller/Projects/mercury/test9_2025dec09/'
-sim_steps = [20000, 40000, 60000, 80000, 100000]
+sim_steps = [100000]
 compress = True
 
 for sim_step in sim_steps:
