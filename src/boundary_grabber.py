@@ -3,13 +3,22 @@
 # Imports:
 import xarray as xr
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
+use_slice = "xy"
+
 # directories
-input_folder = "/Users/danywaller/Projects/mercury/RPS_Base/fig_xz/"
+input_folder = "/Users/danywaller/Projects/mercury/RPS_Base/fig_" + use_slice + "/"
 out_folder = "/Users/danywaller/Projects/mercury/RPS_Base/slice_bowshock/"
 os.makedirs(out_folder, exist_ok=True)
+
+# plot labels
+if use_slice == "xy":
+    ylab = r"$Y\ (\mathrm{R_M})$"
+elif use_slice == "xz":
+    ylab = r"$Z\ (\mathrm{R_M})$"
 
 # percentile thresholds
 Bgradmax = 0.35   # 0.25–0.45
@@ -54,7 +63,7 @@ sim_steps = list(range(27000, 115000 + 1, 1000))
 for sim_step in sim_steps:
     filename = 'Base_' + "%06d" % sim_step
 
-    f = input_folder + "Amitis_RPS_" + filename + "_xz_comp.nc"
+    f = input_folder + "Amitis_RPS_" + filename + "_" + use_slice + "_comp.nc"
 
     ds = xr.open_dataset(f)
 
@@ -72,59 +81,98 @@ for sim_step in sim_steps:
 
     # Build coordinate arrays
     x = np.arange(xmin, xmax, dx)  # [units: m]
-    y = np.arange(zmin, zmax, dz)  # [units: m]
-    # z = np.arange(zmin, zmax, dz)
+
+    if use_slice == "xy":
+        y = np.arange(ymin, ymax, dy)  # [units: m]
+    elif use_slice == "xz":
+        y = np.arange(zmin, zmax, dz)  # [units: m]
 
     # convert to R_m for plotting
     x_plot = x / 2440.e3
     y_plot = y / 2440.e3
-    # z_plot = z / 2440.e3
 
-    # Extract arrays
-    BX = ds[VAR_X].sel(Ny=0, method="nearest").squeeze()  # [units: nT]
-    BY = ds[VAR_Y].sel(Ny=0, method="nearest").squeeze()  # [units: nT]
-    BZ = ds[VAR_Z].sel(Ny=0, method="nearest").squeeze()  # [units: nT]
+    if use_slice == "xy":
+        # Extract arrays
+        BX = ds[VAR_X].sel(Nz=0, method="nearest").squeeze()  # [units: nT]
+        BY = ds[VAR_Y].sel(Nz=0, method="nearest").squeeze()  # [units: nT]
+        BZ = ds[VAR_Z].sel(Nz=0, method="nearest").squeeze()  # [units: nT]
 
-    vx01 = ds[VAR_V1X].sel(Ny=0, method="nearest").squeeze()*1.e3   # convert to m/s
-    vy01 = ds[VAR_V1Y].sel(Ny=0, method="nearest").squeeze()*1.e3   # convert to m/s
-    vz01 = ds[VAR_V1Z].sel(Ny=0, method="nearest").squeeze()*1.e3   # convert to m/s
+        vx01 = ds[VAR_V1X].sel(Nz=0, method="nearest").squeeze()*1.e3   # convert to m/s
+        vy01 = ds[VAR_V1Y].sel(Nz=0, method="nearest").squeeze()*1.e3   # convert to m/s
+        vz01 = ds[VAR_V1Z].sel(Nz=0, method="nearest").squeeze()*1.e3   # convert to m/s
 
-    vx03 = ds[VAR_V3X].sel(Ny=0, method="nearest").squeeze()*1.e3   # convert to m/s
-    vy03 = ds[VAR_V3Y].sel(Ny=0, method="nearest").squeeze()*1.e3   # convert to m/s
-    vz03 = ds[VAR_V3Z].sel(Ny=0, method="nearest").squeeze()*1.e3   # convert to m/s
+        vx03 = ds[VAR_V3X].sel(Nz=0, method="nearest").squeeze()*1.e3   # convert to m/s
+        vy03 = ds[VAR_V3Y].sel(Nz=0, method="nearest").squeeze()*1.e3   # convert to m/s
+        vz03 = ds[VAR_V3Z].sel(Nz=0, method="nearest").squeeze()*1.e3   # convert to m/s
 
-    den01 = ds[VAR_DEN1].sel(Ny=0, method="nearest").squeeze()*1.e-6  # convert to m^-3
-    den03 = ds[VAR_DEN3].sel(Ny=0, method="nearest").squeeze()*1.e-6  # convert to m^-3
+        den01 = ds[VAR_DEN1].sel(Nz=0, method="nearest").squeeze()*1.e-6  # convert to m^-3
+        den03 = ds[VAR_DEN3].sel(Nz=0, method="nearest").squeeze()*1.e-6  # convert to m^-3
+
+        JX = ds[VAR_JX].sel(Nz=0, method="nearest").squeeze()  # [units: nA/m^2]
+        JY = ds[VAR_JY].sel(Nz=0, method="nearest").squeeze()  # [units: nA/m^2]
+        JZ = ds[VAR_JZ].sel(Nz=0, method="nearest").squeeze()  # [units: nA/m^2]
+    elif use_slice == "xz":
+        # Extract arrays
+        BX = ds[VAR_X].sel(Ny=0, method="nearest").squeeze()  # [units: nT]
+        BY = ds[VAR_Y].sel(Ny=0, method="nearest").squeeze()  # [units: nT]
+        BZ = ds[VAR_Z].sel(Ny=0, method="nearest").squeeze()  # [units: nT]
+
+        vx01 = ds[VAR_V1X].sel(Ny=0, method="nearest").squeeze() * 1.e3  # convert to m/s
+        vy01 = ds[VAR_V1Y].sel(Ny=0, method="nearest").squeeze() * 1.e3  # convert to m/s
+        vz01 = ds[VAR_V1Z].sel(Ny=0, method="nearest").squeeze() * 1.e3  # convert to m/s
+
+        vx03 = ds[VAR_V3X].sel(Ny=0, method="nearest").squeeze() * 1.e3  # convert to m/s
+        vy03 = ds[VAR_V3Y].sel(Ny=0, method="nearest").squeeze() * 1.e3  # convert to m/s
+        vz03 = ds[VAR_V3Z].sel(Ny=0, method="nearest").squeeze() * 1.e3  # convert to m/s
+
+        den01 = ds[VAR_DEN1].sel(Ny=0, method="nearest").squeeze() * 1.e-6  # convert to m^-3
+        den03 = ds[VAR_DEN3].sel(Ny=0, method="nearest").squeeze() * 1.e-6  # convert to m^-3
+
+        JX = ds[VAR_JX].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
+        JY = ds[VAR_JY].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
+        JZ = ds[VAR_JZ].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
+
+    # calculate total density
     tot_den = den01 + den03
 
-    JX = ds[VAR_JX].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
-    JY = ds[VAR_JY].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
-    JZ = ds[VAR_JZ].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
-
+    # calculate field magnitudes
     Bmag = np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)
     Vmag01 = np.sqrt(vx01 ** 2 + vy01 ** 2 + vz01 ** 2)
     Vmag03 = np.sqrt(vx03 ** 2 + vy03 ** 2 + vz03 ** 2)
     Vmag = Vmag01 + Vmag03
     Jmag = np.sqrt(JX ** 2 + JY ** 2 + JZ ** 2)
 
-    # compute gradients along x and z
+    # check magnetic field rotation
+    B = xr.concat([BX, BY, BZ], dim="comp")
+    B = B.assign_coords(comp=["x", "y", "z"])
+    Bhat = B / Bmag
+
+    # compute gradients along x and y
     dB_dx = Bmag.differentiate("Nx")
-    dB_dz = Bmag.differentiate("Nz")
-
     dV_dx = Vmag.differentiate("Nx")
-    dV_dz = Vmag.differentiate("Nz")
-
     dJ_dx = Jmag.differentiate("Nx")
-    dJ_dz = Jmag.differentiate("Nz")
-
     dP_dx = tot_den.differentiate("Nx")
-    dP_dz = tot_den.differentiate("Nz")
+    dBhat_dx = Bhat.differentiate("Nx")
+
+    if use_slice == "xy":
+        dB_dz = Bmag.differentiate("Ny")
+        dV_dz = Vmag.differentiate("Ny")
+        dJ_dz = Jmag.differentiate("Ny")
+        dP_dz = tot_den.differentiate("Ny")
+        dBhat_dz = Bhat.differentiate("Ny")
+    elif use_slice == "xz":
+        dB_dz = Bmag.differentiate("Nz")
+        dV_dz = Vmag.differentiate("Nz")
+        dJ_dz = Jmag.differentiate("Nz")
+        dP_dz = tot_den.differentiate("Nz")
+        dBhat_dz = Bhat.differentiate("Nz")
 
     # magnitude of gradient
     gradB = np.sqrt(dB_dx ** 2 + dB_dz ** 2)
     gradV = np.sqrt(dV_dx ** 2 + dV_dz ** 2)
     gradP = np.sqrt(dP_dx ** 2 + dP_dz ** 2)
     gradJ = np.sqrt(dJ_dx ** 2 + dJ_dz ** 2)
+    rotation_strength = (dBhat_dx ** 2 + dBhat_dz ** 2).sum("comp") ** 0.5
 
     bmag_threshold = Bgradmax * np.nanmax(gradB)
     vmag_threshold = Vgradmax * np.nanmax(gradV)
@@ -135,15 +183,6 @@ for sim_step in sim_steps:
     vmag_threshold_mp = Vgradnmax_mp * np.nanmax(gradV)
     jmag_threshold_mp = Jgradmax_mp * np.nanmax(gradJ)
 
-    # check magnetic field rotation
-    B = xr.concat([BX, BY, BZ], dim="comp")
-    B = B.assign_coords(comp=["x", "y", "z"])
-    Bhat = B / Bmag
-
-    dBdx = Bhat.differentiate("Nx")
-    dBdz = Bhat.differentiate("Nz")
-
-    rotation_strength = (dBdx ** 2 + dBdz ** 2).sum("comp") ** 0.5
     rot_threshold = rotmax * np.nanmax(rotation_strength)
     rot_threshold_mp = rotmax_mp * np.nanmax(rotation_strength)
 
@@ -156,9 +195,9 @@ for sim_step in sim_steps:
         plt.xlim([-5, 5])
         plt.ylim([-5, 5])
         plt.xlabel(r"$X\ (\mathrm{R_M})$")
-        plt.ylabel(r"$Z\ (\mathrm{R_M})$")
+        plt.ylabel(ylab)
         plt.title(f"Velocity magnitude gradient,  t = {sim_step * 0.002} seconds")
-        fig_path = os.path.join(out_folder, f"rps_xz_vmag_gradient_{sim_step}.png")
+        fig_path = os.path.join(out_folder, f"rps_{use_slice}_vmag_gradient_{sim_step}.png")
         plt.savefig(fig_path, dpi=300)
         plt.close()
 
@@ -171,9 +210,9 @@ for sim_step in sim_steps:
         plt.xlim([-5, 5])
         plt.ylim([-5, 5])
         plt.xlabel(r"$X\ (\mathrm{R_M})$")
-        plt.ylabel(r"$Z\ (\mathrm{R_M})$")
+        plt.ylabel(ylab)
         plt.title(f"Total density gradient,  t = {sim_step * 0.002} seconds")
-        fig_path = os.path.join(out_folder, f"rps_xz_pmag_gradient_{sim_step}.png")
+        fig_path = os.path.join(out_folder, f"rps_{use_slice}_pmag_gradient_{sim_step}.png")
         plt.savefig(fig_path, dpi=300)
         plt.close()
 
@@ -186,9 +225,9 @@ for sim_step in sim_steps:
         plt.xlim([-5, 5])
         plt.ylim([-5, 5])
         plt.xlabel(r"$X\ (\mathrm{R_M})$")
-        plt.ylabel(r"$Y\ (\mathrm{R_M})$")
+        plt.ylabel(ylab)
         plt.title(f"Rotation strength,  t = {sim_step * 0.002} seconds")
-        fig_path = os.path.join(out_folder, f"rps_xy_rotation_strength_{sim_step}.png")
+        fig_path = os.path.join(out_folder, f"rps_{use_slice}_rotation_strength_{sim_step}.png")
         plt.savefig(fig_path, dpi=300)
         plt.close()
 
@@ -207,8 +246,8 @@ for sim_step in sim_steps:
     bowshock_mask &= ~magnetopause_mask
 
     # exclude plasma sheet
-    x_bad = x_plot < 0
-    y_bad = (y_plot > -0.75) & (y_plot < 0.75)
+    x_bad = x_plot < 0.75
+    y_bad = (y_plot > -1.2) & (y_plot < 1.2)
 
     exclude_region = y_bad[:, None] & x_bad[None, :]
 
@@ -230,13 +269,13 @@ for sim_step in sim_steps:
         ax.add_patch(circle)
 
         ax.set_xlabel(r"$X\ (\mathrm{R_M})$")
-        ax.set_ylabel(r"$Z\ (\mathrm{R_M})$")
+        ax.set_ylabel(ylab)
         plt.xlim([-5, 5])
         plt.ylim([-5, 5])
         ax.set_aspect("equal")
         plt.colorbar(im, label="|B| (nT)")
         plt.title(f"Bow Shock (red) + MP (pink),  t = {sim_step * 0.002} seconds")
-        fig_path = os.path.join(out_folder, f"rps_xz_bmag_bowshock_{sim_step}.png")
+        fig_path = os.path.join(out_folder, f"rps_{use_slice}_bmag_bowshock_{sim_step}_den01-only.png")
         plt.savefig(fig_path, dpi=300)
         plt.close()
 
@@ -249,13 +288,13 @@ for sim_step in sim_steps:
         ax.add_patch(circle)
 
         ax.set_xlabel(r"$X\ (\mathrm{R_M})$")
-        ax.set_ylabel(r"$Z\ (\mathrm{R_M})$")
+        ax.set_ylabel(ylab)
         plt.xlim([-5, 5])
         plt.ylim([-5, 5])
         ax.set_aspect("equal")
         plt.colorbar(im, label="|J| (nA/m²")
         plt.title(f"Bow Shock (blue) + MP (pink),  t = {sim_step * 0.002} seconds")
-        fig_path = os.path.join(out_folder, f"rps_xz_jmag_bowshock_{sim_step}.png")
+        fig_path = os.path.join(out_folder, f"rps_{use_slice}_jmag_bowshock_{sim_step}.png")
         plt.savefig(fig_path, dpi=300)
         plt.close()
 
@@ -268,7 +307,6 @@ bs_stack = np.stack(bs_positions, axis=0).astype(float)
 bs_stack[bs_stack == 0] = np.nan
 
 bs_q1 = np.nanpercentile(bs_stack, 25, axis=0)
-bs_med = np.nanpercentile(bs_stack, 50, axis=0)
 bs_q3 = np.nanpercentile(bs_stack, 75, axis=0)
 
 bs_iqr = bs_q3 - bs_q1
@@ -277,35 +315,227 @@ mp_stack = np.stack(mp_positions, axis=0).astype(float)
 mp_stack[mp_stack == 0] = np.nan
 
 mp_q1 = np.nanpercentile(mp_stack, 25, axis=0)
-mp_med = np.nanpercentile(mp_stack, 50, axis=0)
 mp_q3 = np.nanpercentile(mp_stack, 75, axis=0)
 
 mp_iqr = mp_q3 - mp_q1
 
 Bmag_med = np.median(np.stack(Bmag_list, axis=0), axis=0)
 
+
+def _slice_axes(use_slice: str) -> tuple[str, str]:
+    """
+    Map slice name to (Y-dim, X-dim) used in the 2D masks.
+      use_slice="xy" -> (Ny, Nx)
+      use_slice="xz" -> (Nz, Nx)
+    """
+    use_slice = use_slice.lower().strip()
+    if use_slice == "xy":
+        return "Ny", "Nx"
+    if use_slice == "xz":
+        return "Nz", "Nx"
+    raise ValueError("use_slice must be 'xy' or 'xz'")
+
+
+def occupancy_and_bands(
+    positions: list[xr.DataArray] | xr.DataArray,
+    *,
+    thresholds: tuple[float, float, float] = (0.25, 0.125, 0.0625),
+) -> tuple[xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]:
+    """
+    Statistically consistent summary for binary curve masks.
+
+    Computes per-pixel occupancy probability p in [0,1], then threshold bands:
+      q1mask  = p >= 0.75
+      medmask = p >= 0.50
+      q3mask  = p >= 0.25
+
+    positions:
+      - list of N xarray.DataArray (2D bool masks) each with a scalar 'time' coord, OR
+      - a single xarray.DataArray with dims including 'time' and the 2D slice dims.
+
+    use_slice:
+      - "xy" -> masks are (Ny, Nx)
+      - "xz" -> masks are (Nz, Nx)
+    """
+    Ydim, Xdim = _slice_axes(use_slice)
+
+    # Normalize input -> a single stacked DataArray "stack" with dim time
+    if isinstance(positions, xr.DataArray):
+        da = positions
+        if "time" in da.dims:
+            stack = da.astype(np.uint8)
+            ref = da.isel(time=0)
+        else:
+            # Single 2D mask
+            stack = da.expand_dims(time=[np.datetime64("NaT")]).astype(np.uint8)
+            ref = da
+    else:
+        masks = list(positions)
+        if len(masks) == 0:
+            raise ValueError("positions is empty")
+        for m in masks:
+            if not isinstance(m, xr.DataArray):
+                raise TypeError("Each element of positions must be an xarray.DataArray")
+            if set((Ydim, Xdim)) - set(m.dims):
+                raise ValueError(f"Each mask must include dims ({Ydim},{Xdim}); got {m.dims}")
+
+        stack = xr.concat([m.astype(np.uint8) for m in masks], dim="time")
+        # Preserve per-mask time if present (common in your data)
+        if "time" in masks[0].coords:
+            stack = stack.assign_coords(time=[m.coords["time"].values for m in masks])
+        ref = masks[0]
+
+    # Enforce consistent 2D ordering and coords
+    stack = stack.transpose("time", Ydim, Xdim)
+    p = stack.mean("time").rename("occupancy")
+    p = p.assign_coords({Ydim: ref[Ydim], Xdim: ref[Xdim]})
+
+    q1_thr, med_thr, q3_thr = thresholds
+    q1mask  = (p >= q1_thr).rename("q1mask")
+    medmask = (p >= med_thr).rename("medmask")
+    q3mask  = (p >= q3_thr).rename("q3mask")
+    return p, q1mask, medmask, q3mask
+
+
+def farthest_standoff_at_y0_from_mask(
+    band_mask: xr.DataArray,
+    *,
+    y0: float = 0.0,
+    origin_x: float = 0.0,
+    origin_y: float = 0.0,
+    y_band: int = 50,
+    metric: str = "euclidean",   # "euclidean" or "xmax" (sunward-style)
+) -> dict:
+    """
+    From a boolean band_mask (e.g., q1mask/medmask/q3mask), find the FARTHest standoff point
+    from an origin, restricted to the row(s) closest to Y=y0.
+
+    use_slice:
+      - "xy" uses (Ny, Nx) and interprets y0/origin_y in Ny units
+      - "xz" uses (Nz, Nx) and interprets y0/origin_y in Nz units
+
+    metric:
+      - "euclidean": maximize sqrt((X-origin_x)^2 + (Y-origin_y)^2)
+      - "xmax": maximize X (useful if "standoff" means most sunward at Y≈0)
+    """
+    Ydim, Xdim = _slice_axes(use_slice)
+
+    if not isinstance(band_mask, xr.DataArray):
+        raise TypeError("band_mask must be an xarray.DataArray")
+    if set((Ydim, Xdim)) - set(band_mask.dims):
+        raise ValueError(f"band_mask must include dims ({Ydim},{Xdim}); got {band_mask.dims}")
+
+    band_mask = band_mask.transpose(Ydim, Xdim)
+    arr = band_mask.values.astype(bool)
+    H, W = arr.shape
+
+    Y_vals = band_mask[Ydim].values
+    X_vals = band_mask[Xdim].values
+
+    # closest Y row to y0 (in physical units)
+    y0_row = int(np.argmin(np.abs(Y_vals - y0)))
+    lo = max(0, y0_row - y_band)
+    hi = min(H - 1, y0_row + y_band)
+
+    sub = arr[lo:hi + 1, :]
+    iy_rel, ix = np.nonzero(sub)
+
+    if iy_rel.size == 0:
+        return dict(
+            r_far=np.nan, X_far=np.nan, Y_far=np.nan,
+            x_idx=np.nan, y_idx=np.nan,
+            n_candidates=0, y_used=float(Y_vals[y0_row]),
+            band=(lo, hi),
+            use_slice=use_slice,
+            metric=metric,
+        )
+
+    iy = iy_rel + lo
+    Y = Y_vals[iy]
+    X = X_vals[ix]
+
+    metric = metric.lower().strip()
+    if metric == "euclidean":
+        score = (X - origin_x) ** 2 + (Y - origin_y) ** 2
+        k = int(np.argmax(score))
+        r_far = float(np.sqrt(score[k]))
+    elif metric == "xmax":
+        k = int(np.argmax(X))
+        r_far = float(np.sqrt((X[k] - origin_x) ** 2 + (Y[k] - origin_y) ** 2))
+    else:
+        raise ValueError("metric must be 'euclidean' or 'xmax'")
+
+    return dict(
+        r_far=r_far,
+        X_far=float(X[k]),
+        Y_far=float(Y[k]),
+        x_idx=int(ix[k]),
+        y_idx=int(iy[k]),
+        n_candidates=int(ix.size),
+        y_used=float(Y_vals[y0_row]),
+        band=(lo, hi),
+        metric=metric,
+    )
+
+
+# Consistent occupancy + bands
+bs_p, bs_q1, bs_med, bs_q3 = occupancy_and_bands(bs_positions)
+mp_p, mp_q1, mp_med, mp_q3 = occupancy_and_bands(mp_positions)
+
+# Farthest standoff near Y=0 on the median band
+bs_far = farthest_standoff_at_y0_from_mask(bs_med, y0=0.0, y_band=50, metric="xmax")
+mp_far = farthest_standoff_at_y0_from_mask(mp_med, y0=0.0, y_band=50, metric="xmax")
+
+
 if 1:
     fig2, ax2 = plt.subplots(figsize=(8, 6))
     im2 = ax2.pcolormesh(x_plot, y_plot, Bmag_med, vmin=0, vmax=150, shading='auto', cmap='viridis')
     # Bow shock IQR envelope
-    # ax2.contourf(x_plot, y_plot, (bs_q1 > 0) & (bs_q3 > 0), levels=[0.5, 1], colors='red', alpha=0.7)
+    ax2.contourf(x_plot, y_plot, (bs_q1 > 0) & (bs_q3 > 0), levels=[0.5, 1], colors='red', alpha=0.7)
 
     # Magnetopause IQR envelope
-    # ax2.contourf(x_plot, y_plot, (mp_q1 > 0) & (mp_q3 > 0), levels=[0.5, 1], colors='magenta', alpha=0.7)
+    ax2.contourf(x_plot, y_plot, (mp_q1 > 0) & (mp_q3 > 0), levels=[0.5, 1], colors='magenta', alpha=0.7)
     ax2.contour(x_plot, y_plot, bs_med, levels=[0.5], colors='red', linewidths=2)
     ax2.contour(x_plot, y_plot, mp_med, levels=[0.5], colors='magenta', linewidths=2)
 
     circle = plt.Circle((0, 0), 1, edgecolor='white', facecolor='none', linewidth=1)
     ax2.add_patch(circle)
 
+    if np.isfinite(bs_far["X_far"]) and np.isfinite(bs_far["Y_far"]):
+        ax2.scatter(
+            bs_far["X_far"]/2440.0,
+            bs_far["Y_far"]/2440.0,
+            marker="D",
+            s=60,
+            facecolor="red",
+            edgecolor="black",
+            linewidth=1.5,
+            zorder=10,
+            label=f"Mdn. BS: {round(bs_far["r_far"]/2440.0, 3)} Rₘ",
+        )
+
+    if np.isfinite(mp_far["X_far"]) and np.isfinite(mp_far["Y_far"]):
+        ax2.scatter(
+            mp_far["X_far"]/2440.0,
+            mp_far["Y_far"]/2440.0,
+            marker="D",
+            s=60,
+            facecolor="magenta",
+            edgecolor="black",
+            linewidth=1.5,
+            zorder=10,
+            label=f"Mdn. MP: {round(mp_far["r_far"]/2440.0, 3)} Rₘ",
+        )
+    ax2.legend(loc="upper right")
+
     ax2.set_xlabel(r"$X\ (\mathrm{R_M})$")
-    ax2.set_ylabel(r"$Z\ (\mathrm{R_M})$")
+    ax2.set_ylabel(ylab)
     plt.xlim([-5, 5])
     plt.ylim([-5, 5])
     ax2.set_aspect("equal")
     plt.colorbar(im2, label="|B| (nT)")
-    plt.title("Median Bow Shock (red) + MP (pink)")
-    fig_path = os.path.join(out_folder, f"rps_xz_bmag_bowshock_median.png")
+    plt.title("Bow Shock (red) + MP (pink) Location (IQR + Median)")
+    fig_path = os.path.join(out_folder, f"rps_{use_slice}_bmag_boundary_labels.png")
     plt.savefig(fig_path, dpi=300)
     plt.close()
 
