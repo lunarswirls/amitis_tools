@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -
 """
 Map crustal magnetic field magnitude from an AMITIS HDF file
 onto the near- and far-side surfaces of the Moon and visualize
