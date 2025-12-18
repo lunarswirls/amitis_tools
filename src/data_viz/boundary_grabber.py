@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -
 # Imports:
+import os
+import sys
 import xarray as xr
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
-use_slice = "xy"
+# pick slice for input files
+use_slice = "xz"
+
+# first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
+sim_steps = list(range(27000, 115000 + 1, 1000))
 
 # directories
 input_folder = "/Users/danywaller/Projects/mercury/RPS_Base/fig_" + use_slice + "/"
@@ -19,18 +24,22 @@ if use_slice == "xy":
     ylab = r"$Y\ (\mathrm{R_M})$"
 elif use_slice == "xz":
     ylab = r"$Z\ (\mathrm{R_M})$"
+else:
+    print("\nInvalid use_slice argument: " + use_slice)
+    print("Must be either 'xy' or 'xz'")
+    sys.exit(1)
 
 # percentile thresholds
 Bgradmax = 0.35   # 0.25–0.45
-Vgradmax = 0.10   # 0.05–0.15 velocity jump is strongest at BS
+Vgradmax = 0.10   # 0.05–0.15
 Pgradmax = 0.1   # 0.20–0.35
 Jgradmax = 0.25   # 0.20–0.35
 rotmax    = 0.10  # 0.05–0.15  (weak rotation)
 
 Vgradnmax_mp = 0.25   # 0.20–0.35
-Pgradmax_mp  = 0.75   # 0.85–0.98   (exclude pressure jump)
+Pgradmax_mp  = 0.75   # 0.85–0.98
 Jgradmax_mp  = 0.60   # 0.50–0.75
-rotmax_mp    = 0.1   # 0.60–0.85   main discriminator
+rotmax_mp    = 0.1   # 0.60–0.85  (strong rotation)
 
 # name of variables inside the NetCDF file
 VAR_X = "Bx"   # x-component of B  [units: nT]
@@ -55,10 +64,8 @@ VAR_DEN3 = "den03"   # density of particle species #3  [units: cm^-3]
 bs_positions = []
 mp_positions = []
 
+# preallocate list for Bmag for plot background later
 Bmag_list = []
-
-# first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
-sim_steps = list(range(27000, 115000 + 1, 1000))
 
 for sim_step in sim_steps:
     filename = 'Base_' + "%06d" % sim_step
@@ -86,6 +93,10 @@ for sim_step in sim_steps:
         y = np.arange(ymin, ymax, dy)  # [units: m]
     elif use_slice == "xz":
         y = np.arange(zmin, zmax, dz)  # [units: m]
+    else:
+        print("\nInvalid use_slice argument: " + use_slice)
+        print("Must be either 'xy' or 'xz'")
+        sys.exit(1)
 
     # convert to R_m for plotting
     x_plot = x / 2440.e3
@@ -131,6 +142,10 @@ for sim_step in sim_steps:
         JX = ds[VAR_JX].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
         JY = ds[VAR_JY].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
         JZ = ds[VAR_JZ].sel(Ny=0, method="nearest").squeeze()  # [units: nA/m^2]
+    else:
+        print("\nInvalid use_slice argument: " + use_slice)
+        print("Must be either 'xy' or 'xz'")
+        sys.exit(1)
 
     # calculate total density
     tot_den = den01 + den03
@@ -166,6 +181,10 @@ for sim_step in sim_steps:
         dJ_dz = Jmag.differentiate("Nz")
         dP_dz = tot_den.differentiate("Nz")
         dBhat_dz = Bhat.differentiate("Nz")
+    else:
+        print("\nInvalid use_slice argument: " + use_slice)
+        print("Must be either 'xy' or 'xz'")
+        sys.exit(1)
 
     # magnitude of gradient
     gradB = np.sqrt(dB_dx ** 2 + dB_dz ** 2)
@@ -242,6 +261,7 @@ for sim_step in sim_steps:
                       (gradP > den_threshold) & (dP_dx < 0) &
                       (rotation_strength < rot_threshold_mp))
 
+
     # check no bowshock points have been classified as magnetopause points
     bowshock_mask &= ~magnetopause_mask
 
@@ -300,38 +320,41 @@ for sim_step in sim_steps:
 
     ds.close()
 
+
+# stack all Bmag arrays and take median for plotting
+Bmag_med = np.median(np.stack(Bmag_list, axis=0), axis=0)
+
+# stack and sum all bowshock and magnetopause positions for plotting
 bs_all = np.sum(np.stack(bs_positions, axis=0), axis=0)
 mp_all = np.sum(np.stack(mp_positions, axis=0), axis=0)
 
+# stack all bowshock and magnetopause positions for envelope fitting
 bs_stack = np.stack(bs_positions, axis=0).astype(float)
 bs_stack[bs_stack == 0] = np.nan
-
-bs_q1 = np.nanpercentile(bs_stack, 25, axis=0)
-bs_q3 = np.nanpercentile(bs_stack, 75, axis=0)
-
-bs_iqr = bs_q3 - bs_q1
-
 mp_stack = np.stack(mp_positions, axis=0).astype(float)
 mp_stack[mp_stack == 0] = np.nan
 
+# bowshock IQR from 0.25 to 0.75
+bs_q1 = np.nanpercentile(bs_stack, 25, axis=0)
+bs_q3 = np.nanpercentile(bs_stack, 75, axis=0)
+bs_iqr = bs_q3 - bs_q1
+
+# magnetopause IQR from 0.25 to 0.75
 mp_q1 = np.nanpercentile(mp_stack, 25, axis=0)
 mp_q3 = np.nanpercentile(mp_stack, 75, axis=0)
-
 mp_iqr = mp_q3 - mp_q1
 
-Bmag_med = np.median(np.stack(Bmag_list, axis=0), axis=0)
 
-
-def _slice_axes(use_slice: str) -> tuple[str, str]:
+def _slice_axes(def_slice: str) -> tuple[str, str]:
     """
     Map slice name to (Y-dim, X-dim) used in the 2D masks.
       use_slice="xy" -> (Ny, Nx)
       use_slice="xz" -> (Nz, Nx)
     """
-    use_slice = use_slice.lower().strip()
-    if use_slice == "xy":
+    def_slice = def_slice.lower().strip()
+    if def_slice == "xy":
         return "Ny", "Nx"
-    if use_slice == "xz":
+    if def_slice == "xz":
         return "Nz", "Nx"
     raise ValueError("use_slice must be 'xy' or 'xz'")
 
@@ -345,9 +368,9 @@ def occupancy_and_bands(
     Statistically consistent summary for binary curve masks.
 
     Computes per-pixel occupancy probability p in [0,1], then threshold bands:
-      q1mask  = p >= 0.75
-      medmask = p >= 0.50
-      q3mask  = p >= 0.25
+      q1mask  = p >= 0.25
+      medmask = p >= 0.125
+      q3mask  = p >= 0.0625
 
     positions:
       - list of N xarray.DataArray (2D bool masks) each with a scalar 'time' coord, OR
@@ -397,6 +420,11 @@ def occupancy_and_bands(
     return p, q1mask, medmask, q3mask
 
 
+# Consistent occupancy + bands
+bs_p, _, bs_med, _ = occupancy_and_bands(bs_positions)
+mp_p, _, mp_med, _ = occupancy_and_bands(mp_positions)
+
+
 def farthest_standoff_at_y0_from_mask(
     band_mask: xr.DataArray,
     *,
@@ -404,19 +432,19 @@ def farthest_standoff_at_y0_from_mask(
     origin_x: float = 0.0,
     origin_y: float = 0.0,
     y_band: int = 50,
-    metric: str = "euclidean",   # "euclidean" or "xmax" (sunward-style)
+    metric: str = "xmax",   # "xmax" (sunward-style) or "euclidean"
 ) -> dict:
     """
-    From a boolean band_mask (e.g., q1mask/medmask/q3mask), find the FARTHest standoff point
+    From a boolean band_mask (e.g., q1mask/medmask/q3mask), find the farthest standoff point
     from an origin, restricted to the row(s) closest to Y=y0.
 
     use_slice:
-      - "xy" uses (Ny, Nx) and interprets y0/origin_y in Ny units
-      - "xz" uses (Nz, Nx) and interprets y0/origin_y in Nz units
+        - "xy" uses (Ny, Nx) and interprets y0/origin_y in Ny units
+        - "xz" uses (Nz, Nx) and interprets y0/origin_y in Nz units
 
     metric:
-      - "euclidean": maximize sqrt((X-origin_x)^2 + (Y-origin_y)^2)
-      - "xmax": maximize X (useful if "standoff" means most sunward at Y≈0)
+        - "xmax": maximize X if "standoff" means most sunward at Y≈0
+        - "euclidean": maximize sqrt((X-origin_x)^2 + (Y-origin_y)^2)
     """
     Ydim, Xdim = _slice_axes(use_slice)
 
@@ -478,14 +506,17 @@ def farthest_standoff_at_y0_from_mask(
     )
 
 
-# Consistent occupancy + bands
-bs_p, bs_q1, bs_med, bs_q3 = occupancy_and_bands(bs_positions)
-mp_p, mp_q1, mp_med, mp_q3 = occupancy_and_bands(mp_positions)
-
 # Farthest standoff near Y=0 on the median band
 bs_far = farthest_standoff_at_y0_from_mask(bs_med, y0=0.0, y_band=50, metric="xmax")
 mp_far = farthest_standoff_at_y0_from_mask(mp_med, y0=0.0, y_band=50, metric="xmax")
 
+# bs_far and mp_far are dicts from farthest_standoff_at_y0_from_mask
+standoff_df = pd.DataFrame([
+    dict(region="bow_shock", **bs_far),
+    dict(region="magnetopause", **mp_far),
+])
+
+standoff_df.to_csv(os.path.join(out_folder, f"rps_{use_slice}_standoff_summary.csv"), index=False)
 
 if 1:
     fig2, ax2 = plt.subplots(figsize=(8, 6))

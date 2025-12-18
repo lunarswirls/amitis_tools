@@ -62,7 +62,8 @@ for sim_step in sim_steps:
     # dBx = np.abs(BXT - BX)
     # dBy = np.abs(BYT - BY)
     # dBz = np.abs(BZT - BZ)
-    dBmag_raw = np.sqrt(BXT ** 2 + BYT ** 2 + BZT ** 2) - np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)
+    # dBmag_raw = np.sqrt(BXT ** 2 + BYT ** 2 + BZT ** 2) - np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)
+    dBmag_raw = np.sqrt((BXT - BX) ** 2 + (BYT - BY) ** 2 + (BZT - BZ) ** 2)  # - np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)
 
     threshold = 150.0
 
@@ -101,6 +102,6 @@ for sim_step in sim_steps:
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     # Save figure
-    fig_path = os.path.join(out_folder, f"rps_b_diff_{sim_step}.png")
+    fig_path = os.path.join(out_folder, f"rps_b_diff_{sim_step}_newmethod.png")
     plt.savefig(fig_path, dpi=300)
     plt.close(fig)
