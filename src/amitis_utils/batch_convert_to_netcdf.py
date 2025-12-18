@@ -98,4 +98,4 @@ for sim_step in sim_steps:
 
     obj_netcdf.close()
 
-    # print(f'Done writing {obj_hdf.file_path + filename}.nc')
+    print(f'Done writing {obj_hdf.file_path + filename}.nc')
