@@ -34,7 +34,7 @@ Bgradmax = 0.35   # 0.25–0.45
 Vgradmax = 0.10   # 0.05–0.15
 Pgradmax = 0.1   # 0.20–0.35
 Jgradmax = 0.25   # 0.20–0.35
-rotmax    = 0.10  # 0.05–0.15  (weak rotation)
+rotmax    = 0.1  # 0.05–0.15  (weak rotation)
 
 Vgradnmax_mp = 0.25   # 0.20–0.35
 Pgradmax_mp  = 0.75   # 0.85–0.98
@@ -236,6 +236,21 @@ for sim_step in sim_steps:
         plt.close()
 
     if 0:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        im = ax.pcolormesh(x_plot, y_plot, rotation_strength, vmin=0, vmax=0.005, shading='auto', cmap='cividis')
+        circle = plt.Circle((0, 0), 1, edgecolor='white', facecolor='none', linewidth=2)
+        ax.add_patch(circle)
+        plt.colorbar(im, label="|rotation|")
+        plt.xlim([-5, 5])
+        plt.ylim([-5, 5])
+        plt.xlabel(r"$X\ (\mathrm{R_M})$")
+        plt.ylabel(ylab)
+        plt.title(f"Rotation strength,  t = {sim_step * 0.002} seconds")
+        fig_path = os.path.join(out_folder, f"rps_{use_slice}_rotation_strength_{sim_step}.png")
+        plt.savefig(fig_path, dpi=300)
+        plt.close()
+
+    if 1:
         fig, ax = plt.subplots(figsize=(8, 6))
         im = ax.pcolormesh(x_plot, y_plot, rotation_strength, vmin=0, vmax=0.005, shading='auto', cmap='cividis')
         circle = plt.Circle((0, 0), 1, edgecolor='white', facecolor='none', linewidth=2)
