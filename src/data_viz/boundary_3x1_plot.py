@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 # ----------------------------
 debug = False
 
+base = "RPS"
+
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 
 # Plot background selection
@@ -49,7 +51,7 @@ PLOT_BG = {
 # first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
 sim_steps = list(range(27000, 115000 + 1, 1000))
 
-base_dir = "/Users/danywaller/Projects/mercury/RPS_Base/"
+base_dir = f"/Users/danywaller/Projects/mercury/{base}_Base/"
 out_folder = os.path.join(base_dir, "slice_bowshock/")
 os.makedirs(out_folder, exist_ok=True)
 
@@ -411,7 +413,7 @@ for sim_step in sim_steps:
 
     for ax, use_slice in zip(axes, use_slices):
         input_folder = os.path.join(base_dir, f"fig_{use_slice}")
-        f = os.path.join(input_folder, f"Amitis_RPS_{filename}_{use_slice}_comp.nc")
+        f = os.path.join(input_folder, f"Amitis_{base}_{filename}_{use_slice}_comp.nc")
 
         if not os.path.exists(f):
             ax.axis("off")
@@ -450,9 +452,9 @@ for sim_step in sim_steps:
         cbar.set_label(rf"${cfg['label']}$")
 
     tsec = sim_step * 0.002
-    fig.suptitle(f"BS ({cfg['bs_col']}) + MP ({cfg['mp_col']}) position at t = {tsec:.3f} s", fontsize=18, y=0.99)
+    fig.suptitle(f"{base} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) position at t = {tsec:.3f} s", fontsize=18, y=0.99)
 
-    outpath = os.path.join(out_folder_ts, f"rps_{plot_id.lower()}_boundaries_xyz_{sim_step:06d}.png")
+    outpath = os.path.join(out_folder_ts, f"{base}_{plot_id.lower()}_boundaries_xyz_{sim_step:06d}.png")
     fig.savefig(outpath, dpi=300)
     plt.close(fig)
 
@@ -516,9 +518,9 @@ if last_im is not None:
     cbar = fig.colorbar(last_im, ax=axes, location="right", shrink=0.9)
     cbar.set_label(rf"$\mathrm{{Median}}\ {cfg['label']}$")
 
-fig.suptitle(f"BS ({cfg['bs_col']}) + MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=18, y=0.99)
+fig.suptitle(f"{base} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=18, y=0.99)
 
-median_path = os.path.join(out_folder, f"rps_{plot_id.lower()}_boundaries_xyz_median.png")
+median_path = os.path.join(out_folder, f"{base}_{plot_id.lower()}_boundaries_xyz_median.png")
 fig.savefig(median_path, dpi=300)
 plt.close(fig)
 
