@@ -51,10 +51,13 @@ PLOT_BG = {
 }
 
 # first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
-# sim_steps = list(range(27000, 115000 + 1, 1000))
-sim_steps = list(range(1000, 115000 + 1, 1000))
+if base == "RPS" or base == "CPS":
+    sim_steps = range(27000, 115000 + 1, 1000)
+else:
+    sim_steps = range(98000, 115000 + 1, 1000)
+# sim_steps = list(range(1000, 115000 + 1, 1000))
 
-base_dir = f"/Users/danywaller/Projects/mercury/{base}_Base/"
+base_dir = f"/Users/danywaller/Projects/mercury/extreme_base/{base}_Base/"
 out_folder = os.path.join(base_dir, "slice_bowshock/")
 os.makedirs(out_folder, exist_ok=True)
 
@@ -435,18 +438,20 @@ for sim_step in sim_steps:
         x_plot, y_plot, plot_bg, bs_mask, mp_mask = compute_masks_one_timestep(ds, use_slice, plot_id)
         ds.close()
 
-        # accumulate for post-loop median plot
-        acc[use_slice]["plot_bg"].append(plot_bg)
-        acc[use_slice]["bs"].append(bs_mask.values.astype(np.uint8))  # store as 0/1
-        acc[use_slice]["mp"].append(mp_mask.values.astype(np.uint8))
-        acc[use_slice]["x_plot"] = x_plot
-        acc[use_slice]["y_plot"] = y_plot
+        if bs_mask.size != 0 and mp_mask.size != 0:
+            # accumulate for post-loop median plot
+            acc[use_slice]["plot_bg"].append(plot_bg)
+            acc[use_slice]["bs"].append(bs_mask.values.astype(np.uint8))  # store as 0/1
+            acc[use_slice]["mp"].append(mp_mask.values.astype(np.uint8))
+            acc[use_slice]["x_plot"] = x_plot
+            acc[use_slice]["y_plot"] = y_plot
 
         # per-timestep plot
         cfg = PLOT_BG[plot_id]
         last_im = ax.pcolormesh(x_plot, y_plot, plot_bg, shading="auto", cmap=cfg["cmap"], vmin=cfg["vmin"], vmax=cfg["vmax"])
-        ax.contour(x_plot, y_plot, bs_mask.values.astype(float), levels=[0.5], colors=cfg['bs_col'], linewidths=2)
-        ax.contour(x_plot, y_plot, mp_mask.values.astype(float), levels=[0.5], colors=cfg['mp_col'], linewidths=2)
+        if bs_mask.size != 0 and mp_mask.size != 0:
+            ax.contour(x_plot, y_plot, bs_mask.values.astype(float), levels=[0.5], colors=cfg['bs_col'], linewidths=2)
+            ax.contour(x_plot, y_plot, mp_mask.values.astype(float), levels=[0.5], colors=cfg['mp_col'], linewidths=2)
         ax.add_patch(plt.Circle((0, 0), 1, edgecolor="white", facecolor="none", linewidth=1))
 
         xlabel, ylabel = labels_for_slice(use_slice)

@@ -14,9 +14,11 @@ debug = False
 base = "RPS"
 
 use_slices = ["xy", "xz", "yz"]  # plot all 3
+n_slices = len(use_slices)       # number of requested slices
+slice_tag = "_".join(use_slices)
 
 # Plot background selection
-plot_id = "Pmag"   # options: "Bmag", "Jmag", "Pmag"
+plot_id = "Bz"   # options: "Bmag", "Jmag", "Pmag", "Bz"
 
 PLOT_BG = {
     "Bmag": {
@@ -39,23 +41,38 @@ PLOT_BG = {
     },
     "Pmag": {
         "key": "gradP",
-        "label": r"N\ (\mathrm{m^{-3}})",
+        "label": r"N\ (\mathrm{cm^{-3}})",
         "cmap": "cividis",
         "vmin": 0,
-        "vmax": 0.1e-3,
+        "vmax": 100.,
         "bs_col": "red",
         "mp_col": "magenta",
+    },
+    "Bz": {
+        "key": "Bz",
+        "label": r"B_z\ (\mathrm{nT})",
+        "cmap": "coolwarm",
+        "vmin": -50,
+        "vmax": 50.,
+        "bs_col": "cyan",
+        "mp_col": "limegreen",
     },
 }
 
 # first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
-sim_steps = list(range(27000, 115000 + 1, 1000))
+if 0:
+    if base == "RPS" or base == "CPS":
+        sim_steps = range(27000, 115000 + 1, 1000)
+    else:
+        sim_steps = range(98000, 115000 + 1, 1000)
 
-base_dir = f"/Users/danywaller/Projects/mercury/{base}_Base/"
+sim_steps = range(98000, 115000 + 1, 1000)
+
+base_dir = f"/Users/danywaller/Projects/mercury/extreme_base/{base}_Base/"
 out_folder = os.path.join(base_dir, "slice_bowshock/")
 os.makedirs(out_folder, exist_ok=True)
 
-out_folder_ts = os.path.join(out_folder, "timeseries_xyz/")
+out_folder_ts = os.path.join(out_folder, f"timeseries_{slice_tag}/")
 os.makedirs(out_folder_ts, exist_ok=True)
 
 RM_M = 2440.0e3
@@ -143,8 +160,8 @@ def extract_slice_fields(ds: xr.Dataset, use_slice: str):
     vy03 = ds[VAR_V3Y].sel(**sel_kw, method="nearest").squeeze() * 1e3  # convert to m/s
     vz03 = ds[VAR_V3Z].sel(**sel_kw, method="nearest").squeeze() * 1e3  # convert to m/s
 
-    den01 = ds[VAR_DEN1].sel(**sel_kw, method="nearest").squeeze() * 1e-6  # convert to m^-3
-    den03 = ds[VAR_DEN3].sel(**sel_kw, method="nearest").squeeze() * 1e-6  # convert to m^-3
+    den01 = ds[VAR_DEN1].sel(**sel_kw, method="nearest").squeeze() * 1e6  # convert to m^-3
+    den03 = ds[VAR_DEN3].sel(**sel_kw, method="nearest").squeeze() * 1e6  # convert to m^-3
 
     JX = ds[VAR_JX].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
     JY = ds[VAR_JY].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
@@ -354,12 +371,16 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str):
         "Bmag": Bmag,
         "Jmag": Jmag,
         "Pmag": Pmag,
+        "Bz": BZ
     }
 
     if plot_id not in bg_map:
         raise ValueError(f"Invalid plot_id='{plot_id}'. Options: {list(bg_map)}")
 
     plot_bg = bg_map[plot_id].values
+
+    if plot_id == "Pmag":
+        plot_bg = plot_bg * 1e-6  # convert back to cm^-3
 
     return x_plot, y_plot, plot_bg, bowshock_mask, magnetopause_mask
 
@@ -454,7 +475,7 @@ for sim_step in sim_steps:
     tsec = sim_step * 0.002
     fig.suptitle(f"{base} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) position at t = {tsec:.3f} s", fontsize=18, y=0.99)
 
-    outpath = os.path.join(out_folder_ts, f"{base}_{plot_id.lower()}_boundaries_xyz_{sim_step:06d}.png")
+    outpath = os.path.join(out_folder_ts, f"{base}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
     fig.savefig(outpath, dpi=300)
     plt.close(fig)
 
@@ -520,7 +541,7 @@ if last_im is not None:
 
 fig.suptitle(f"{base} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=18, y=0.99)
 
-median_path = os.path.join(out_folder, f"{base}_{plot_id.lower()}_boundaries_xyz_median.png")
+median_path = os.path.join(out_folder, f"{base}_{plot_id.lower()}_boundaries_{slice_tag}_median.png")
 fig.savefig(median_path, dpi=300)
 plt.close(fig)
 
