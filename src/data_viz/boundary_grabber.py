@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 # ----------------------------
 debug = False
 
-base = "CPN"
+base = "CPS"
 
+# use_slices = ["xy", "xz", "yz"]  # plot all 3
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 n_slices = len(use_slices)       # number of requested slices
 slice_tag = "_".join(use_slices)

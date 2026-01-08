@@ -11,10 +11,12 @@ import matplotlib.pyplot as plt
 # Configuration
 # -------------------------------
 
-case = "CPN"        # choose case
+case = "CPS"        # choose case
 
-input_folder1 = f"/Users/danywaller/Projects/mercury/extreme_base/{case}_Base/object/"
-output_folder = f"/Users/danywaller/Projects/mercury/extreme_base/surface_flux/timeseries_{case.lower()}"
+# input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
+# output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
+input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/High_HNHV/{case}_HNHV/object/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/High_HNHV_surface_flux/timeseries_{case.lower()}"
 os.makedirs(output_folder, exist_ok=True)
 
 R_M = 2440.0        # Mercury radius [km]
@@ -26,8 +28,10 @@ LON_BINS = 360      # [degrees]
 # Load grid (once)
 # -------------------------------
 ds0 = xr.open_dataset(
-    os.path.join(input_folder1, f"Amitis_{case}_Base_000000_xz_comp.nc")
+    # os.path.join(input_folder1, f"Amitis_{case}_Base_000000_xz_comp.nc")
     # Amitis_{case}_Base_000000_xz_comp.nc
+
+    os.path.join(input_folder1, f"Amitis_{case}_HNHV_115000_xz_comp.nc")
 )
 
 x = ds0["Nx"].values  # [units: km]
@@ -35,14 +39,16 @@ y = ds0["Ny"].values  # [units: km]
 z = ds0["Nz"].values  # [units: km]
 
 # take last 10-ish seconds
-sim_steps = range(98000, 115000 + 1, 1000)
+# sim_steps = range(98000, 115000 + 1, 1000)
+sim_steps = range(115000, 350000 + 1, 1000)
 
 t_index = 0
 
 for step in sim_steps:
 
     ds1 = xr.open_dataset(
-        os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
+        # os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
+        os.path.join(input_folder1, f"Amitis_{case}_HNHV_{step:06d}_xz_comp.nc")
     )
 
     # Total density   # [units: cm^-3]
@@ -57,10 +63,8 @@ for step in sim_steps:
     vz = (ds1["vz01"].isel(time=t_index).values + ds1["vz02"].isel(time=t_index).values
           + ds1["vz03"].isel(time=t_index).values + ds1["vz04"].isel(time=t_index).values)
 
-    # Convert velocities from km/s to cm/s
-    vx_cms = vx * 1e5
-    vy_cms = vy * 1e5
-    vz_cms = vz * 1e5
+    # Convert density from cm^-3 to km^-3
+    den_km = den * 1e15
 
     # Radial unit vector at each grid point (same shape as den)
     # Assuming grid points x,y,z already loaded from ds0
@@ -70,8 +74,11 @@ for step in sim_steps:
     ny = Yg / r_mag
     nz = Zg / r_mag
 
-    # Radial flux in cm^-2 s^-1
-    flux = den * (vx_cms * nx + vy_cms * ny + vz_cms * nz)
+    # Radial flux in km^-2 s^-1
+    flux_km = den_km * (vx * nx + vy * ny + vz * nz)
+
+    # convert to cm^-2 s^-1
+    flux = flux_km * 1e-10
 
     # -------------------------------
     # Interpolator (Cartesian space)
@@ -119,6 +126,12 @@ for step in sim_steps:
     Zn = Zs / R_M
 
     # -------------------------------
+    # Calculate min and max for clims
+    # -------------------------------
+    c_min = np.nanpercentile(flux_surface, 5)
+    c_max = np.nanpercentile(flux_surface, 95)
+
+    # -------------------------------
     # Fine grid interpolation
     # -------------------------------
     LAT_FINE = 360*3
@@ -150,8 +163,8 @@ for step in sim_steps:
     lon_grid_fine_shifted = (lon_grid_fine - 180) % 360
     x_flat_shifted = lon_grid_fine_shifted.ravel()
 
-    quick_cmax = 100e6
-    quick_cmin = -150e6
+    quick_cmax = 10e7
+    quick_cmin = -10e7
 
     # -------------------------------
     # 2D plot of everything
@@ -165,8 +178,8 @@ for step in sim_steps:
         c=z_flat,
         s=2,
         cmap="viridis",
-        vmin=quick_cmin,
-        vmax=quick_cmax
+        vmin=quick_cmax,
+        vmax=quick_cmin
     )
 
     # --- Colorbar ---
@@ -185,7 +198,8 @@ for step in sim_steps:
     ax.set_title(f"{case} Surface Flux, t = {step * 0.002} seconds")
 
     # --- Save ---
-    outfile_png = os.path.join(output_folder, f"{case}_surface_flux_{step}.png")
+    outfile_png = os.path.join(output_folder, f"{case}_HNHV_surface_flux_{step}.png")
     plt.tight_layout()
     plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
     print("Saved:\t", outfile_png)
+    plt.close()
