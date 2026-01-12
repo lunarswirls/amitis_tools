@@ -1,0 +1,378 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import os
+import numpy as np
+import pandas as pd
+import xarray as xr
+from scipy.interpolate import RegularGridInterpolator
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+from scipy.interpolate import UnivariateSpline
+
+# -------------------------------
+# Configuration
+# -------------------------------
+cases = ["RPS", "CPS", "RPN", "CPN"]
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
+os.makedirs(output_folder, exist_ok=True)
+
+R_M = 2440.0        # Mercury radius [km]
+LAT_BINS = 180      # Surface latitude bins
+LON_BINS = 360      # Surface longitude bins
+
+quickplot = True  # override subplot arrangement for debugging
+
+def lon_diff(a, b):
+    """Minimal angular difference in degrees."""
+    return np.abs(((a - b + 180) % 360) - 180)
+
+
+def compute_open_fraction(
+        df,
+        lon0,
+        dlon=2.0,
+        lat_bins=np.linspace(0, 90, 91),
+        hemisphere="north"
+):
+    """
+    Compute the fraction of open magnetic field lines as a function of latitude
+    for a given longitude slice.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing at least the columns:
+        'latitude_deg', 'longitude_deg', 'median_classification'.
+        'median_classification' should be one of 'open', 'closed', or 'solar_wind'.
+    lon0 : float
+        Target longitude (degrees) for the slice.
+    dlon : float, optional
+        Width of longitude window around lon0 to select points (default 2.0 deg).
+    lat_bins : array_like, optional
+        Array of latitude bin edges in degrees (default 0–90 deg in 0.5 deg steps).
+    hemisphere : str, optional
+        'north' or 'south' hemisphere to consider (default 'north').
+
+    Returns
+    -------
+    lat_centers : ndarray
+        Centers of latitude bins (degrees).
+    frac_open : ndarray
+        Fraction of open field lines in each latitude bin. NaN if insufficient points.
+
+    Notes
+    -----
+    - For the southern hemisphere, latitudes are mirrored to positive values
+      for consistent computation from pole toward equator.
+    - Bins with fewer than 3 points are assigned NaN.
+    """
+
+    # Select points near target longitude, accounting for periodicity
+    sub = df[np.abs(((df["longitude_deg"] - lon0 + 180) % 360) - 180) < dlon]
+
+    # Select hemisphere and mirror south latitudes to positive
+    if hemisphere == "north":
+        sub = sub[sub["latitude_deg"] > 0]
+        lat_vals = sub["latitude_deg"].values
+    else:
+        sub = sub[sub["latitude_deg"] < 0]
+        lat_vals = -sub["latitude_deg"].values  # mirror south for consistent handling
+
+    # Skip if too few points to compute a reliable fraction
+    if len(sub) < 10:
+        return None, None
+
+    # Boolean mask: True where the field line is classified as 'open'
+    open_mask = (sub["median_classification"] == "open").values
+
+    frac_open = []
+    # Compute bin centers
+    lat_centers = 0.5 * (lat_bins[:-1] + lat_bins[1:])
+
+    # Loop over latitude bins
+    for lo, hi in zip(lat_bins[:-1], lat_bins[1:]):
+        mask = (lat_vals >= lo) & (lat_vals < hi)
+        if np.sum(mask) < 3:
+            # Insufficient points → NaN
+            frac_open.append(np.nan)
+        else:
+            # Fraction of points in bin classified as 'open'
+            frac_open.append(np.mean(open_mask[mask]))
+
+    return lat_centers, np.array(frac_open)
+
+
+def find_transition_lat(lat, frac_open, threshold):
+    """
+    Find the latitude where topology transitions from open to closed
+    when scanning equatorward.
+    """
+    valid = np.isfinite(frac_open)
+    lat = lat[valid]
+    frac_open = frac_open[valid]
+
+    if len(lat) < 5:
+        return None
+
+    # sort from pole → equator
+    order = np.argsort(lat)[::-1]
+    lat = lat[order]
+    frac_open = frac_open[order]
+
+    for i in range(1, len(lat)):
+        if frac_open[i-1] >= threshold and frac_open[i] < threshold:
+            # linear interpolation
+            w = ((threshold - frac_open[i-1]) /
+                 (frac_open[i] - frac_open[i-1]))
+            return lat[i-1] + w * (lat[i] - lat[i-1])
+
+    return None
+
+
+def compute_ocb_transition(
+    df,
+    lon_bins,
+    hemisphere="north",
+    threshold=0.75,
+    max_jump_deg=10.0
+):
+    """
+    Compute the open-closed boundary (OCB) transition latitude as a function of longitude.
+
+    Scans equatorward from the pole to find where the fraction of open field lines
+    drops below the threshold. If a computed boundary point jumps more than `max_jump_deg`
+    toward the pole relative to the previous point, the previous latitude is reused.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with columns 'latitude_deg', 'longitude_deg', 'median_classification'.
+    lon_bins : array-like
+        Longitudes (deg) at which to compute the boundary.
+    hemisphere : {'north', 'south'}
+        Hemisphere to compute.
+    threshold : float
+        Fraction of open field lines defining the transition.
+    max_jump_deg : float
+        Maximum allowed poleward jump in latitude between neighboring points along the boundary.
+
+    Returns
+    -------
+    lons : ndarray
+        Longitudes of boundary points.
+    lats : ndarray
+        Latitudes of boundary points.
+    """
+
+    lons_all = []
+    lats_all = []
+
+    prev_lat = None
+
+    for lon0 in lon_bins:
+        lat_c, frac_open = compute_open_fraction(df, lon0, hemisphere=hemisphere)
+        if lat_c is None:
+            continue
+
+        lat_b = find_transition_lat(lat_c, frac_open, threshold)
+        if lat_b is None:
+            continue
+
+        if hemisphere == "south":
+            lat_b = -lat_b
+
+        # If previous latitude exists, check poleward jump
+        if prev_lat is not None:
+            jump = lat_b - prev_lat if hemisphere == "north" else prev_lat - lat_b
+            if jump > max_jump_deg:
+                # Reject jump: use previous value
+                lat_b = prev_lat
+
+        lons_all.append(lon0)
+        lats_all.append(lat_b)
+        prev_lat = lat_b
+
+    return np.array(lons_all), np.array(lats_all)
+
+
+# -------------------------------
+# Prepare figure
+# -------------------------------
+fig, axs = plt.subplots(2, 2, figsize=(12, 6))
+
+for case in cases:
+
+    input_folder1  = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
+
+    input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+    csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # CSV with footprints
+
+    # -------------------------------
+    # Load footprint CSV
+    # -------------------------------
+    if os.path.exists(csv_file):
+        df_footprints = pd.read_csv(csv_file)
+        # print(f"Loaded {len(df_footprints)} footprints for {case}")
+    else:
+        print(f"No footprint CSV found for {case}, skipping footprints")
+        df_footprints = pd.DataFrame(columns=["latitude_deg", "longitude_deg", "classification"])
+
+    # -------------------------------
+    # Load grid (assume first file is representative)
+    # -------------------------------
+    first_file = sorted([f for f in os.listdir(input_folder1) if f.endswith("_xz_comp.nc")])[0]
+    ds0 = xr.open_dataset(os.path.join(input_folder1, first_file))
+
+    x = ds0["Nx"].values
+    y = ds0["Ny"].values
+    z = ds0["Nz"].values
+
+    # -------------------------------
+    # Time-average total radial flux
+    # -------------------------------
+    flux_sum = None
+    count = 0
+
+    # Consider last N steps (adjust as needed)
+    sim_steps = range(106000, 115000 + 1, 1000)
+
+    for step in sim_steps:
+        nc_file = os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
+        ds = xr.open_dataset(nc_file)
+
+        # Total density (protons + alphas)
+        den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values +
+               ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
+
+        # Total velocity
+        vx = (ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values +
+              ds["vx03"].isel(time=0).values + ds["vx04"].isel(time=0).values)
+        vy = (ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values +
+              ds["vy03"].isel(time=0).values + ds["vy04"].isel(time=0).values)
+        vz = (ds["vz01"].isel(time=0).values + ds["vz02"].isel(time=0).values +
+              ds["vz03"].isel(time=0).values + ds["vz04"].isel(time=0).values)
+
+        # Convert velocities from km/s to cm/s
+        vx_cms, vy_cms, vz_cms = vx * 1e5, vy * 1e5, vz * 1e5
+
+        # Radial unit vector at each grid point
+        Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
+        r_mag = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
+        nx, ny, nz = Xg / r_mag, Yg / r_mag, Zg / r_mag
+
+        # Radial flux: n * (v dot r_hat)
+        flux = den * (vx_cms * nx + vy_cms * ny + vz_cms * nz)
+
+        if flux_sum is None:
+            flux_sum = np.zeros_like(flux, dtype=np.float64)
+        flux_sum += flux
+        count += 1
+
+    flux_avg = flux_sum / count
+    print(f"Computed time-averaged radial flux for {case}")
+
+    # -------------------------------
+    # Interpolate radial flux onto Mercury surface
+    # -------------------------------
+    lat = np.linspace(-90, 90, LAT_BINS)
+    lon = np.linspace(-180, 180, LON_BINS)
+
+    lat_r = np.deg2rad(lat)
+    lon_r = np.deg2rad(lon)
+    Xs = R_M * np.cos(lat_r[:, None]) * np.cos(lon_r[None, :])
+    Ys = R_M * np.cos(lat_r[:, None]) * np.sin(lon_r[None, :])
+    Zs = R_M * np.sin(lat_r[:, None]) * np.ones_like(lon_r[None, :])
+
+    points_surface = np.stack((Zs, Ys, Xs), axis=-1).reshape(-1, 3)
+    interp = RegularGridInterpolator((z, y, x), flux_avg, bounds_error=False, fill_value=np.nan)
+    flux_surface = interp(points_surface).reshape(LAT_BINS, LON_BINS)
+    flux_surface = flux_surface[::-1, :]  # flip latitude for plotting
+
+    # -------------------------------
+    # Plot
+    # -------------------------------
+    if case == "RPS":
+        row, col = 0, 0
+    elif case == "CPS":
+        row, col = 1, 0
+    elif case == "RPN":
+        row, col = 0, 1
+    elif case == "CPN":
+        row, col = 1, 1
+
+    ax = axs[row, col]
+
+    quick_cmax = 100e6
+    quick_cmin = -150e6
+
+    # Surface flux
+    lon_grid, lat_grid = np.meshgrid(lon, lat)
+    sc = ax.scatter(lon_grid, lat_grid, c=flux_surface, s=2, cmap="viridis", vmin=quick_cmax, vmax=quick_cmin)
+    cbar = fig.colorbar(sc, ax=ax)
+    cbar.set_label("Radial flux [cm$^{-2}$ s$^{-1}$]")
+
+    # Overlay footprints
+    if 0:
+        # for topo, color in [("closed", "blue"), ("open", "white")]:
+        for topo, color in [("open", "white")]:
+            subset = df_footprints[df_footprints['median_classification'] == topo]
+            if not subset.empty:
+                ax.scatter(subset['longitude_deg'], subset['latitude_deg'], s=1, color=color, facecolor=None, alpha=0.2)
+
+    # -------------------------------
+    # Open–Closed Boundary (OCB)
+    # -------------------------------
+    lon_bins = np.linspace(-180, 180, 180)
+
+    lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
+    lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
+
+    ax.plot(lon_n, lat_n, color="white", lw=2)
+    ax.plot(lon_s, lat_s, color="white", lw=2, ls="--")
+
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-90, 90)
+    ax.set_xlabel("Longitude [°]")
+    ax.set_ylabel("Latitude [°]")
+    ax.set_title(case)
+    ax.grid(True)
+    # ax.legend()
+
+if 0:
+    legend_handles = [
+        mlines.Line2D([], [], color="white", marker="o", linestyle="None",
+                      markersize=6, label="Open field line footprint"),
+        # Uncomment if you later add closed
+        # mlines.Line2D([], [], color="blue", marker="o", linestyle="None",
+        #               markersize=6, label="Closed field line footprint"),
+    ]
+
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        facecolor='slategrey', framealpha=1,
+        frameon=True,
+        fontsize=10,
+        fancybox=True,
+    )
+
+legend_handles = [
+    mlines.Line2D([], [], color="white", lw=2, label="OCB (North)"),
+    mlines.Line2D([], [], color="white", lw=2, linestyle="--", label="OCB (South)")
+]
+
+fig.legend(
+    handles=legend_handles,
+    loc="lower center",
+    ncol=2,
+    frameon=True,
+    fontsize=10,
+)
+
+# -------------------------------
+# Save figure
+# -------------------------------
+plt.tight_layout()
+outfile_png = os.path.join(output_folder, "all_cases_surface_flux_with_footprints.png")
+plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
+print("Saved figure:", outfile_png)
