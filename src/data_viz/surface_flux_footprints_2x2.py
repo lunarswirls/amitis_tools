@@ -6,8 +6,6 @@ import pandas as pd
 import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
-from scipy.interpolate import UnivariateSpline
 
 # -------------------------------
 # Configuration
@@ -22,7 +20,9 @@ LON_BINS = 360      # Surface longitude bins
 
 
 def lon_diff(a, b):
-    """Minimal angular difference in degrees."""
+    """
+    Minimal angular difference in degrees.
+    """
     return np.abs(((a - b + 180) % 360) - 180)
 
 
@@ -240,16 +240,12 @@ for case in cases:
         ds = xr.open_dataset(nc_file)
 
         # Total density (protons + alphas) [units: cm^-3]
-        den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values +
-               ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
+        den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values + ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
 
         # Total velocity [units: km/s]
-        vx = (ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values +
-              ds["vx03"].isel(time=0).values + ds["vx04"].isel(time=0).values)
-        vy = (ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values +
-              ds["vy03"].isel(time=0).values + ds["vy04"].isel(time=0).values)
-        vz = (ds["vz01"].isel(time=0).values + ds["vz02"].isel(time=0).values +
-              ds["vz03"].isel(time=0).values + ds["vz04"].isel(time=0).values)
+        vx = (ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values + ds["vx03"].isel(time=0).values + ds["vx04"].isel(time=0).values)
+        vy = (ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values + ds["vy03"].isel(time=0).values + ds["vy04"].isel(time=0).values)
+        vz = (ds["vz01"].isel(time=0).values + ds["vz02"].isel(time=0).values + ds["vz03"].isel(time=0).values + ds["vz04"].isel(time=0).values)
 
         # Convert velocities from km/s to cm/s
         vx_cms, vy_cms, vz_cms = vx * 1e5, vy * 1e5, vz * 1e5
@@ -257,6 +253,8 @@ for case in cases:
         # Radial unit vector at each grid point
         Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
         r_mag = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
+
+        # this is defined such that negative flux is 'precipitation'
         nx, ny, nz = Xg / r_mag, Yg / r_mag, Zg / r_mag
 
         # Radial flux: n * (v dot r_hat)
@@ -318,9 +316,7 @@ for case in cases:
             if not subset.empty:
                 ax.scatter(subset['longitude_deg'], subset['latitude_deg'], s=1, color=color, facecolor=None, alpha=0.2)
 
-    # -------------------------------
     # Open–Closed Boundary (OCB)
-    # -------------------------------
     lon_bins = np.linspace(-180, 180, 180)
     lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
     lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
@@ -355,9 +351,7 @@ for case in cases:
     ax.set_title(case)
     ax.grid(True, alpha=0.3, color="black")
 
-# -------------------------------
 # Save figure
-# -------------------------------
 plt.tight_layout()
 outfile_png = os.path.join(output_folder, "all_cases_surface_flux_with_footprints.png")
 plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
