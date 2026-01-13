@@ -20,7 +20,6 @@ R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
 
-quickplot = True  # override subplot arrangement for debugging
 
 def lon_diff(a, b):
     """Minimal angular difference in degrees."""
@@ -198,7 +197,7 @@ def compute_ocb_transition(
 # -------------------------------
 # Prepare figure
 # -------------------------------
-fig, axs = plt.subplots(2, 2, figsize=(12, 6))
+fig, axs = plt.subplots(2, 2, figsize=(12, 8), subplot_kw={"projection": "hammer"})
 
 for case in cases:
 
@@ -240,11 +239,11 @@ for case in cases:
         nc_file = os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
         ds = xr.open_dataset(nc_file)
 
-        # Total density (protons + alphas)
+        # Total density (protons + alphas) [units: cm^-3]
         den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values +
                ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
 
-        # Total velocity
+        # Total velocity [units: km/s]
         vx = (ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values +
               ds["vx03"].isel(time=0).values + ds["vx04"].isel(time=0).values)
         vy = (ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values +
@@ -291,25 +290,25 @@ for case in cases:
     # -------------------------------
     # Plot
     # -------------------------------
-    if case == "RPS":
-        row, col = 0, 0
-    elif case == "CPS":
-        row, col = 1, 0
-    elif case == "RPN":
-        row, col = 0, 1
-    elif case == "CPN":
-        row, col = 1, 1
+    if case == "RPN": row, col = 0, 0
+    elif case == "CPN": row, col = 1, 0
+    elif case == "RPS": row, col = 0, 1
+    elif case == "CPS": row, col = 1, 1
 
     ax = axs[row, col]
 
     quick_cmax = 100e6
     quick_cmin = -150e6
 
+    # Plot flux
+    lon_grid, lat_grid = np.meshgrid(lon_r, lat_r)  # radians
+    # shift lon to [-pi, pi]
+    lon_grid = np.where(lon_grid > np.pi, lon_grid - 2*np.pi, lon_grid)
+
     # Surface flux
-    lon_grid, lat_grid = np.meshgrid(lon, lat)
-    sc = ax.scatter(lon_grid, lat_grid, c=flux_surface, s=2, cmap="viridis", vmin=quick_cmax, vmax=quick_cmin)
-    cbar = fig.colorbar(sc, ax=ax)
-    cbar.set_label("Radial flux [cm$^{-2}$ s$^{-1}$]")
+    sc = ax.pcolormesh(lon_grid, lat_grid, flux_surface, cmap="viridis", shading="auto", vmin=quick_cmax, vmax=quick_cmin)
+    cbar = fig.colorbar(sc, ax=ax, orientation="horizontal", pad=0.05, shrink=0.5)
+    cbar.set_label("F [cm$^{-2}$ s$^{-1}$]")
 
     # Overlay footprints
     if 0:
@@ -323,51 +322,38 @@ for case in cases:
     # Open–Closed Boundary (OCB)
     # -------------------------------
     lon_bins = np.linspace(-180, 180, 180)
-
     lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
     lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
 
-    ax.plot(lon_n, lat_n, color="white", lw=2)
-    ax.plot(lon_s, lat_s, color="white", lw=2, ls="--")
+    # Convert to radians for Mollweide
+    lon_n_rad = np.deg2rad(lon_n)
+    lat_n_rad = np.deg2rad(lat_n)
+    lon_s_rad = np.deg2rad(lon_s)
+    lat_s_rad = np.deg2rad(lat_s)
 
-    ax.set_xlim(-180, 180)
-    ax.set_ylim(-90, 90)
-    ax.set_xlabel("Longitude [°]")
-    ax.set_ylabel("Latitude [°]")
+    # Mollweide longitude in matplotlib goes from -pi to pi (radians)
+    # Latitude stays as is
+    ax.plot(lon_n_rad, lat_n_rad, color="white", lw=2, label="OCB North")
+    ax.plot(lon_s_rad, lat_s_rad, color="white", lw=2, ls="--", label="OCB South")
+
+    # Longitude ticks (-170 to 170 every n °)
+    lon_ticks_deg = np.arange(-120, 121, 60)
+    lon_ticks_rad = np.deg2rad(lon_ticks_deg)
+
+    # Latitude ticks (-90 to 90 every n °)
+    lat_ticks_deg = np.arange(-60, 61, 30)
+    lat_ticks_rad = np.deg2rad(lat_ticks_deg)
+
+    # Apply to the current axis
+    ax.set_xticks(lon_ticks_rad)
+    ax.set_yticks(lat_ticks_rad)
+
+    # Label ticks in degrees
+    ax.set_xticklabels([f"{int(l)}°" for l in lon_ticks_deg])
+    ax.set_yticklabels([f"{int(l)}°" for l in lat_ticks_deg])
+
     ax.set_title(case)
-    ax.grid(True)
-    # ax.legend()
-
-if 0:
-    legend_handles = [
-        mlines.Line2D([], [], color="white", marker="o", linestyle="None",
-                      markersize=6, label="Open field line footprint"),
-        # Uncomment if you later add closed
-        # mlines.Line2D([], [], color="blue", marker="o", linestyle="None",
-        #               markersize=6, label="Closed field line footprint"),
-    ]
-
-    fig.legend(
-        handles=legend_handles,
-        loc="lower center",
-        facecolor='slategrey', framealpha=1,
-        frameon=True,
-        fontsize=10,
-        fancybox=True,
-    )
-
-legend_handles = [
-    mlines.Line2D([], [], color="white", lw=2, label="OCB (North)"),
-    mlines.Line2D([], [], color="white", lw=2, linestyle="--", label="OCB (South)")
-]
-
-fig.legend(
-    handles=legend_handles,
-    loc="lower center",
-    ncol=2,
-    frameon=True,
-    fontsize=10,
-)
+    ax.grid(True, alpha=0.3, color="black")
 
 # -------------------------------
 # Save figure
