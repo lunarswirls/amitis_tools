@@ -14,7 +14,7 @@ debug = False
 # --------------------------
 # SETTINGS
 # --------------------------
-case = "CPS"
+case = "RPS"
 input_folder_xy = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xy/"
 input_folder_xz = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xz/"
 input_folder_yz = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_yz/"
@@ -264,14 +264,14 @@ for ncfile in last_files:
     # --------------------------
     # FIELD LINE PLOT (X-Z)
     # --------------------------
-    colors = {"closed": "blue", "open": "red", "TBD": "grey"}
-    lines_by_topo = {"closed": [], "open": [], "TBD": []}
+    colors = {"closed": "blue", "open": "red"}
+    lines_by_topo = {"closed": [], "open": []}
 
     for seed in seeds:
         traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step)
         traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=-h_step)
         topo = classify(traj_fwd, traj_bwd, RM, exit_fwd_y, exit_bwd_y)
-        if topo not in ["derp"]:
+        if topo not in ["TBD"]:
             lines_by_topo[topo].append(traj_fwd[:, [0,2]])
             lines_by_topo[topo].append(traj_bwd[:, [0,2]])
 
@@ -284,14 +284,13 @@ for ncfile in last_files:
             ax.add_collection(lc)
     ax.add_patch(plt.Circle((0,0), RM, edgecolor='black', facecolor="black", alpha=0.5, linewidth=2))
     legend_handles = [mlines.Line2D([],[],color="blue",label="Closed"),
-                      mlines.Line2D([],[],color="red",label="Open"),
-                      mlines.Line2D([],[],color="grey",label="TBD")]
+                      mlines.Line2D([],[],color="red",label="Open")]
     ax.legend(handles=legend_handles, loc="upper right")
     step = int(ncfile.split("_")[3])
     ax.set_xlabel("X [km]")
     ax.set_ylabel("Z [km]")
     ax.set_aspect("equal")
-    ax.set_title(f"{case} Magnetic Field-Line Topology (X–Z Plane), t = {step*0.002} s")
+    ax.set_title(f"{case} Magnetic Field-Line Topology, t = {step*0.002} s")
     ax.set_xlim(-5*RM, 5*RM)
     ax.set_ylim(-5*RM, 5*RM)
     plt.tight_layout()

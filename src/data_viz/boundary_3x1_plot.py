@@ -18,7 +18,7 @@ n_slices = len(use_slices)       # number of requested slices
 slice_tag = "_".join(use_slices)
 
 # Plot background selection
-plot_id = "Bz"   # options: "Bmag", "Jmag", "Pmag", "Bz"
+plot_id = "Pmag"   # options: "Bmag", "Jmag", "Pmag", "Bz"
 
 PLOT_BG = {
     "Bmag": {
@@ -75,7 +75,7 @@ os.makedirs(out_folder, exist_ok=True)
 out_folder_ts = os.path.join(out_folder, f"timeseries_{slice_tag}/")
 os.makedirs(out_folder_ts, exist_ok=True)
 
-RM_M = 2440.0e3
+RM_M = 2440.0e3  # units: m
 
 # threshold percentiles
 Bgradmax = 0.3
