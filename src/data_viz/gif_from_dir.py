@@ -3,7 +3,7 @@ import os
 from PIL import Image
 
 # Use settings from mag_calc_plot
-base = "RPN"
+base = "RPS"
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 n_slices = len(use_slices)       # number of requested slices
 slice_tag = "_".join(use_slices)
@@ -15,9 +15,13 @@ plot_id = "Pmag"   # options: "Bmag", "Jmag", "Pmag"
 
 # output_file = os.path.join(plot_folder, f"{base}_{plot_id.lower()}_{slice_tag}.gif")
 
-indir = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{base}_Base/"  # Directory containing image frames
-plot_folder_ts = os.path.join(indir, f"topology/")
-output_file = os.path.join(indir, f"{base}_field_topology.gif")
+# indir = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{base}_Base/"  # Directory containing image frames
+# plot_folder_ts = os.path.join(indir, f"topology/")
+# output_file = os.path.join(indir, f"{base}_field_topology.gif")
+
+indir = f"/Users/danywaller/Projects/mercury/extreme/High_HNHV_surface_flux/"
+plot_folder_ts = os.path.join(indir, f"timeseries_{base.lower()}/")
+output_file = os.path.join(indir, f"{base}_HNHV_surface_flux.gif")
 
 duration = 100  # Frame duration (ms)
 loop = 1  # Loop count (0 = infinite)
