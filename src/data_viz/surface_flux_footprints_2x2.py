@@ -27,48 +27,39 @@ def compute_radial_flux(ds, x, y, z):
 
     """
 
-    # --- densities (cm^-3)
-    den01 = ds["den01"].isel(time=0).values
-    den02 = ds["den02"].isel(time=0).values
-    den03 = ds["den03"].isel(time=0).values
-    den04 = ds["den04"].isel(time=0).values
+    # densities converted from cm^-3 to km^-3
+    den01 = ds["den01"].isel(time=0).values * 1e15
+    den02 = ds["den02"].isel(time=0).values * 1e15
+    den03 = ds["den03"].isel(time=0).values * 1e15
+    den04 = ds["den04"].isel(time=0).values * 1e15
 
-    den_tot = den01 + den02 + den03 + den04
+    # sum all densities to get total density
+    den_tot = (den01 + den02 + den03 + den04)
 
-    # --- density-weighted bulk velocity (km/s), safe division
+    # density-weighted bulk velocity (km/s)
     vx_bulk = np.zeros_like(den_tot)
     vy_bulk = np.zeros_like(den_tot)
     vz_bulk = np.zeros_like(den_tot)
 
+    # mask where total density is > 0
     mask = den_tot > 0
 
-    vx_bulk[mask] = (
-                            den01[mask] * ds["vx01"].isel(time=0).values[mask] +
-                            den02[mask] * ds["vx02"].isel(time=0).values[mask] +
-                            den03[mask] * ds["vx03"].isel(time=0).values[mask] +
-                            den04[mask] * ds["vx04"].isel(time=0).values[mask]
-                    ) / den_tot[mask]
+    vx_bulk[mask] = (den01[mask] * ds["vx01"].isel(time=0).values[mask] +
+                     den02[mask] * ds["vx02"].isel(time=0).values[mask] +
+                     den03[mask] * ds["vx03"].isel(time=0).values[mask] +
+                     den04[mask] * ds["vx04"].isel(time=0).values[mask]) / den_tot[mask]
 
-    vy_bulk[mask] = (
-                            den01[mask] * ds["vy01"].isel(time=0).values[mask] +
-                            den02[mask] * ds["vy02"].isel(time=0).values[mask] +
-                            den03[mask] * ds["vy03"].isel(time=0).values[mask] +
-                            den04[mask] * ds["vy04"].isel(time=0).values[mask]
-                    ) / den_tot[mask]
+    vy_bulk[mask] = (den01[mask] * ds["vy01"].isel(time=0).values[mask] +
+                     den02[mask] * ds["vy02"].isel(time=0).values[mask] +
+                     den03[mask] * ds["vy03"].isel(time=0).values[mask] +
+                     den04[mask] * ds["vy04"].isel(time=0).values[mask]) / den_tot[mask]
 
-    vz_bulk[mask] = (
-                            den01[mask] * ds["vz01"].isel(time=0).values[mask] +
-                            den02[mask] * ds["vz02"].isel(time=0).values[mask] +
-                            den03[mask] * ds["vz03"].isel(time=0).values[mask] +
-                            den04[mask] * ds["vz04"].isel(time=0).values[mask]
-                    ) / den_tot[mask]
+    vz_bulk[mask] = (den01[mask] * ds["vz01"].isel(time=0).values[mask] +
+                     den02[mask] * ds["vz02"].isel(time=0).values[mask] +
+                     den03[mask] * ds["vz03"].isel(time=0).values[mask] +
+                     den04[mask] * ds["vz04"].isel(time=0).values[mask]) / den_tot[mask]
 
-    # km/s → cm/s
-    vx_bulk *= 1e5
-    vy_bulk *= 1e5
-    vz_bulk *= 1e5
-
-    # --- build position grids (Nz, Ny, Nx)
+    # build position grids (Nz, Ny, Nx)
     Zg, Yg, Xg = np.meshgrid(z, y, x, indexing="ij")
 
     r_mag = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
@@ -83,9 +74,14 @@ def compute_radial_flux(ds, x, y, z):
     ny[mask_r] = -Yg[mask_r] / r_mag[mask_r]
     nz[mask_r] = -Zg[mask_r] / r_mag[mask_r]
 
-    # radial flux
+    # radial velocity [km/s]
     v_dot_r = vx_bulk * nx + vy_bulk * ny + vz_bulk * nz
+
+    # weighted flux [km^-2 s^-1]
     flux = den_tot * v_dot_r
+
+    # convert from km^-2 s^-1 to cm^-2 s^-1
+    flux *= 1e-10
 
     return flux
 
@@ -310,32 +306,6 @@ for case in cases:
     for step in sim_steps:
         nc_file = os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
         ds = xr.open_dataset(nc_file)
-
-        if debug:
-            print(ds["den01"].dims)
-            print(ds["den01"].shape)
-            print(len(x), len(y), len(z))
-
-        # Total density (protons + alphas) [units: cm^-3]
-        den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values + ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
-
-        # Total velocity [units: km/s]
-        vx = (ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values + ds["vx03"].isel(time=0).values + ds["vx04"].isel(time=0).values)
-        vy = (ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values + ds["vy03"].isel(time=0).values + ds["vy04"].isel(time=0).values)
-        vz = (ds["vz01"].isel(time=0).values + ds["vz02"].isel(time=0).values + ds["vz03"].isel(time=0).values + ds["vz04"].isel(time=0).values)
-
-        # Convert velocities from km/s to cm/s
-        vx_cms, vy_cms, vz_cms = vx * 1e5, vy * 1e5, vz * 1e5
-
-        # Radial unit vector at each grid point
-        Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
-        r_mag = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
-
-        # this is defined such that negative flux is 'precipitation'
-        nx, ny, nz = Xg / r_mag, Yg / r_mag, Zg / r_mag
-
-        # Radial flux: n * (v dot r_hat)
-        # flux = den * (vx_cms * nx + vy_cms * ny + vz_cms * nz)
 
         flux = compute_radial_flux(ds, x, y, z)
 

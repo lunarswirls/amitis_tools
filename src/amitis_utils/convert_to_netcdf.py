@@ -1,10 +1,11 @@
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
+case = "CPN"
 sim_step = 115000
-filename = 'Amitis_RPS_Base_' + "%06d"%(sim_step)
+filename = f'Amitis_{case}_Base_' + "%06d"%(sim_step)
 compress = True
-obj_hdf  = amitis_hdf('/Volumes/data_backup/extreme_base/RPS_Base/05/out/',
+obj_hdf  = amitis_hdf(f'/Volumes/data_backup/extreme_base/{case}_Base/05/out/',
                       filename + '.h5')
 
 debug = False
@@ -54,7 +55,7 @@ if 1:
 
     bmag = np.sqrt(bx**2 + by**2 + bz**2)
 
-if 0:
+if 1:
     Ex  = obj_hdf.load_dataset('Ex', 1.0e3)   # (V/m) => (mV/m)
     Ey  = obj_hdf.load_dataset('Ey', 1.0e3)
     Ez  = obj_hdf.load_dataset('Ez', 1.0e3)
@@ -100,7 +101,7 @@ obj_netcdf.write(by      , 'By'      , 'nT'  )
 obj_netcdf.write(bz      , 'Bz'      , 'nT'  )
 obj_netcdf.write(bmag    , 'Bmag'    , 'nT'  )
 
-if 0:
+if 1:
     obj_netcdf.write(den_tot , 'den_tot' , 'cm-3')
 
     obj_netcdf.write(vx      , 'vx_tot'  , 'km/s')
