@@ -3,7 +3,7 @@ import os
 from PIL import Image
 
 # Use settings from mag_calc_plot
-base = "RPS"
+base = "CPS"
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 n_slices = len(use_slices)       # number of requested slices
 slice_tag = "_".join(use_slices)

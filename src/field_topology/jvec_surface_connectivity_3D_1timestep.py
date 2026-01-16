@@ -5,10 +5,10 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import xarray as xr
-from numba import njit
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 import matplotlib.lines as mlines
+from src.field_topology.topology_utils import *
 
 debug = False
 make_plots = True
@@ -43,105 +43,6 @@ n_lat = 75
 n_lon = n_lat*2
 max_steps = 100000
 h_step = 50.0
-
-# --------------------------
-# Numba functions
-# --------------------------
-@njit
-def trilinear_interp(x_grid, y_grid, z_grid, B, xi, yi, zi):
-    i = np.searchsorted(x_grid, xi) - 1
-    j = np.searchsorted(y_grid, yi) - 1
-    k = np.searchsorted(z_grid, zi) - 1
-    i = max(0, min(i, len(x_grid)-2))
-    j = max(0, min(j, len(y_grid)-2))
-    k = max(0, min(k, len(z_grid)-2))
-    xd = (xi - x_grid[i]) / (x_grid[i+1]-x_grid[i])
-    yd = (yi - y_grid[j]) / (y_grid[j+1]-y_grid[j])
-    zd = (zi - z_grid[k]) / (z_grid[k+1]-z_grid[k])
-    c000 = B[i,j,k]
-    c100 = B[i+1,j,k]
-    c010 = B[i,j+1,k]
-    c001 = B[i,j,k+1]
-    c101 = B[i+1,j,k+1]
-    c011 = B[i,j+1,k+1]
-    c110 = B[i+1,j+1,k]
-    c111 = B[i+1,j+1,k+1]
-    c00 = c000*(1-xd)+c100*xd
-    c01 = c001*(1-xd)+c101*xd
-    c10 = c010*(1-xd)+c110*xd
-    c11 = c011*(1-xd)+c111*xd
-    c0 = c00*(1-yd)+c10*yd
-    c1 = c01*(1-yd)+c11*yd
-    return c0*(1-zd)+c1*zd
-
-@njit
-def get_B(r, Bx, By, Bz, x_grid, y_grid, z_grid):
-    bx = trilinear_interp(x_grid, y_grid, z_grid, Bx, r[0], r[1], r[2])
-    by = trilinear_interp(x_grid, y_grid, z_grid, By, r[0], r[1], r[2])
-    bz = trilinear_interp(x_grid, y_grid, z_grid, Bz, r[0], r[1], r[2])
-    B = np.array([bx, by, bz])
-    norm = np.linalg.norm(B)
-    if norm == 0.0:
-        return np.zeros(3)
-    return B / norm
-
-@njit
-def cartesian_to_latlon(r):
-    rmag = np.linalg.norm(r)
-    lat = np.degrees(np.arcsin(r[2]/rmag))
-    lon = np.degrees(np.arctan2(r[1], r[0]))
-    return lat, lon
-
-@njit
-def rk45_step(f, r, h, Bx, By, Bz, x_grid, y_grid, z_grid):
-    k1 = f(r, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k2 = f(r + h*k1*0.25, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k3 = f(r + h*(3*k1+9*k2)/32, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k4 = f(r + h*(1932*k1 - 7200*k2 + 7296*k3)/2197, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k5 = f(r + h*(439*k1/216 - 8*k2 + 3680*k3/513 - 845*k4/4104), Bx, By, Bz, x_grid, y_grid, z_grid)
-    k6 = f(r + h*(-8*k1/27 + 2*k2 - 3544*k3/2565 + 1859*k4/4104 - 11*k5/40), Bx, By, Bz, x_grid, y_grid, z_grid)
-    r_next = r + h*(16*k1/135 + 6656*k3/12825 + 28561*k4/56430 - 9*k5/50 + 2*k6/55)
-    return r_next
-
-@njit
-def trace_field_line_rk(seed, Bx, By, Bz, x_grid, y_grid, z_grid, RM, max_steps=5000, h=50.0, surface_tol=-1.0):
-    traj = np.empty((max_steps, 3), dtype=np.float64)
-    traj[0] = seed
-    r = seed.copy()
-    exit_y_boundary = False
-    for i in range(1, max_steps):
-        B = get_B(r, Bx, By, Bz, x_grid, y_grid, z_grid)
-        if np.all(B == 0.0):
-            return traj[:i], exit_y_boundary
-        r_next = rk45_step(get_B, r, h, Bx, By, Bz, x_grid, y_grid, z_grid)
-        traj[i] = r_next
-        r = r_next
-        if np.linalg.norm(r) <= RM + surface_tol:
-            return traj[:i+1], exit_y_boundary
-        if (r[0]<x_grid[0] or r[0]>x_grid[-1] or
-            r[2]<z_grid[0] or r[2]>z_grid[-1]):
-            return traj[:i+1], exit_y_boundary
-        if r[1]<y_grid[0] or r[1]>y_grid[-1]:
-            exit_y_boundary = True
-            return traj[:i+1], exit_y_boundary
-    return traj, exit_y_boundary
-
-@njit
-def classify(traj_fwd, traj_bwd, RM, exit_fwd_y=False, exit_bwd_y=False):
-    # check if last point in trajectory is equal to or less than Mercury radius
-    hit_fwd = np.linalg.norm(traj_fwd[-1]) <= RM
-    hit_bwd = np.linalg.norm(traj_bwd[-1]) <= RM
-    if exit_fwd_y or exit_bwd_y:
-        # line ran into domain boundary - terminate as unknown
-        return "TBD"
-    if hit_fwd and hit_bwd:
-        # line originated from and returned to planet surface - closed
-        return "closed"
-    elif hit_fwd or hit_bwd:
-        # line connected to planet surface at only ONE end - open
-        return "open"
-    else:
-        return "TBD"
 
 # --------------------------
 # CREATE SURFACE SEEDS
@@ -246,9 +147,9 @@ for seed in seeds:
     traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Jx, Jy, Jz, x, y, z, plot_depth, max_steps=max_steps, h=h_step)
     traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Jx, Jy, Jz, x, y, z, plot_depth, max_steps=max_steps, h=-h_step)
     topo = classify(traj_fwd, traj_bwd, plot_depth, exit_fwd_y, exit_bwd_y)
-    if topo not in ["TBD"]:
-        lines_by_topo[topo].append(traj_fwd[:, [0, 2]])
-        lines_by_topo[topo].append(traj_bwd[:, [0, 2]])
+    if topo in ["closed", "open"]:
+        lines_by_topo[topo].append(traj_fwd)
+        lines_by_topo[topo].append(traj_bwd)
 
     for traj in [traj_fwd, traj_bwd]:
         r_end = traj[-1]
@@ -273,17 +174,21 @@ if make_plots:
     # FIELD LINE PLOT (X-Z)
     # --------------------------
     colors = {"closed": "blue", "open": "red"}
-
     fig, ax = plt.subplots(figsize=(7,7))
+
+    # Draw Mercury surface
     theta = np.linspace(0, 2*np.pi, 400)
     ax.plot(plot_depth*np.cos(theta), plot_depth*np.sin(theta), "k", lw=2)
+
+    # Plot traced field lines
     for topo, segments in lines_by_topo.items():
         if segments:
             lc = LineCollection(segments, colors=colors[topo], linewidths=0.8, alpha=0.5)
             ax.add_collection(lc)
+
     ax.add_patch(plt.Circle((0,0), RM, edgecolor='black', facecolor=None, alpha=1.0, linewidth=2))
-    legend_handles = [mlines.Line2D([],[],color="blue",label="Closed"),
-                      mlines.Line2D([],[],color="red",label="Open")]
+    # Legend
+    legend_handles = [mlines.Line2D([], [], color=c, label=k) for k, c in colors.items() if k in ["closed", "open"]]
     ax.legend(handles=legend_handles, loc="upper right")
 
     ax.set_xlabel("X [km]")

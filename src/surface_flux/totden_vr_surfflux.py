@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 import os
 import numpy as np
-import pandas as pd
 import xarray as xr
+from flux_utils import compute_radial_flux
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
 
@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 # Configuration
 # -------------------------------
 case = "RPS"
+input_folder1  = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 os.makedirs(output_folder, exist_ok=True)
 
@@ -19,72 +20,6 @@ debug = False
 R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
-
-
-def compute_radial_flux(ds, x, y, z):
-    """
-    Compute radial particle flux F_r = n (v_bulk · r_hat) where v_bulk is the weighted velocity
-
-    """
-
-    # densities converted from cm^-3 to km^-3
-    den01 = ds["den01"].isel(time=0).values * 1e15
-    den02 = ds["den02"].isel(time=0).values * 1e15
-    den03 = ds["den03"].isel(time=0).values * 1e15
-    den04 = ds["den04"].isel(time=0).values * 1e15
-
-    # sum all densities to get total density
-    den_tot = (den01 + den02 + den03 + den04)
-
-    # density-weighted bulk velocity (km/s)
-    vx_bulk = np.zeros_like(den_tot)
-    vy_bulk = np.zeros_like(den_tot)
-    vz_bulk = np.zeros_like(den_tot)
-
-    # mask where total density is > 0
-    mask = den_tot > 0
-
-    vx_bulk[mask] = (den01[mask] * ds["vx01"].isel(time=0).values[mask] +
-                     den02[mask] * ds["vx02"].isel(time=0).values[mask] +
-                     den03[mask] * ds["vx03"].isel(time=0).values[mask] +
-                     den04[mask] * ds["vx04"].isel(time=0).values[mask]) / den_tot[mask]
-
-    vy_bulk[mask] = (den01[mask] * ds["vy01"].isel(time=0).values[mask] +
-                     den02[mask] * ds["vy02"].isel(time=0).values[mask] +
-                     den03[mask] * ds["vy03"].isel(time=0).values[mask] +
-                     den04[mask] * ds["vy04"].isel(time=0).values[mask]) / den_tot[mask]
-
-    vz_bulk[mask] = (den01[mask] * ds["vz01"].isel(time=0).values[mask] +
-                     den02[mask] * ds["vz02"].isel(time=0).values[mask] +
-                     den03[mask] * ds["vz03"].isel(time=0).values[mask] +
-                     den04[mask] * ds["vz04"].isel(time=0).values[mask]) / den_tot[mask]
-
-    # --- build position grids (Nz, Ny, Nx)
-    Zg, Yg, Xg = np.meshgrid(z, y, x, indexing="ij")
-
-    r_mag = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
-    mask_r = r_mag > 0
-
-    # Inward radial unit vector
-    nx = np.zeros_like(r_mag)
-    ny = np.zeros_like(r_mag)
-    nz = np.zeros_like(r_mag)
-
-    nx[mask_r] = -Xg[mask_r] / r_mag[mask_r]
-    ny[mask_r] = -Yg[mask_r] / r_mag[mask_r]
-    nz[mask_r] = -Zg[mask_r] / r_mag[mask_r]
-
-    # radial velocity [km/s]
-    v_dot_r = vx_bulk * nx + vy_bulk * ny + vz_bulk * nz
-    flux = den_tot * v_dot_r
-
-    # convert from km^-2 s^-1 to cm^-2 s^-1
-    flux *= 1e-10
-
-    return flux, v_dot_r
-
-
-input_folder1  = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 
 # -------------------------------
 # Load grid (assume first file is representative)
@@ -95,7 +30,6 @@ ds0 = xr.open_dataset(os.path.join(input_folder1, first_file))
 x = ds0["Nx"].values
 y = ds0["Ny"].values
 z = ds0["Nz"].values
-
 
 nc_file = os.path.join(input_folder1, f"Amitis_{case}_Base_115000_xz_comp.nc")
 ds = xr.open_dataset(nc_file)

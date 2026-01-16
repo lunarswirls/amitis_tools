@@ -4,6 +4,7 @@
 import os
 import numpy as np
 import xarray as xr
+from src.surface_flux.flux_utils import compute_radial_flux
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
 
@@ -11,7 +12,7 @@ import matplotlib.pyplot as plt
 # Configuration
 # -------------------------------
 
-case = "CPS"        # choose case
+case = "CPS"
 
 # input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 # output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
@@ -45,40 +46,10 @@ sim_steps = range(115000, 350000 + 1, 1000)
 t_index = 0
 
 for step in sim_steps:
+    nc_file = os.path.join(input_folder1, f"Amitis_{case}_HNHV_{step:06d}_xz_comp.nc")
+    ds = xr.open_dataset(nc_file)
 
-    ds1 = xr.open_dataset(
-        # os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
-        os.path.join(input_folder1, f"Amitis_{case}_HNHV_{step:06d}_xz_comp.nc")
-    )
-
-    # Total density   # [units: cm^-3]
-    den = (ds1["den01"].isel(time=t_index).values + ds1["den02"].isel(time=t_index).values  # protons
-           + ds1["den03"].isel(time=t_index).values + ds1["den04"].isel(time=t_index).values)  # alphas
-
-    # Velocities   # [units: km/s]
-    vx = (ds1["vx01"].isel(time=t_index).values + ds1["vx02"].isel(time=t_index).values  # protons
-          + ds1["vx03"].isel(time=t_index).values + ds1["vx04"].isel(time=t_index).values)  # alphas
-    vy = (ds1["vy01"].isel(time=t_index).values + ds1["vy02"].isel(time=t_index).values
-          + ds1["vy03"].isel(time=t_index).values + ds1["vy04"].isel(time=t_index).values)
-    vz = (ds1["vz01"].isel(time=t_index).values + ds1["vz02"].isel(time=t_index).values
-          + ds1["vz03"].isel(time=t_index).values + ds1["vz04"].isel(time=t_index).values)
-
-    # Convert density from cm^-3 to km^-3
-    den_km = den * 1e15
-
-    # Radial unit vector at each grid point (same shape as den)
-    # Assuming grid points x,y,z already loaded from ds0
-    Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
-    r_mag = np.sqrt(Xg**2 + Yg**2 + Zg**2)
-    nx = Xg / r_mag
-    ny = Yg / r_mag
-    nz = Zg / r_mag
-
-    # Radial flux in km^-2 s^-1
-    flux_km = den_km * (vx * nx + vy * ny + vz * nz)
-
-    # convert to cm^-2 s^-1
-    flux = flux_km * 1e-10
+    flux, vr = compute_radial_flux(ds, x, y, z)
 
     # -------------------------------
     # Interpolator (Cartesian space)
@@ -94,7 +65,7 @@ for step in sim_steps:
     # Surface grid
     # -------------------------------
     lat = np.linspace(-90, 90, LAT_BINS)
-    lon = np.linspace(0, 360, LON_BINS)
+    lon = np.linspace(-180, 180, LON_BINS)
 
 
     def surface_points_from_angles(lat_deg, lon_deg, RM):
@@ -126,21 +97,15 @@ for step in sim_steps:
     Zn = Zs / R_M
 
     # -------------------------------
-    # Calculate min and max for clims
-    # -------------------------------
-    c_min = np.nanpercentile(flux_surface, 5)
-    c_max = np.nanpercentile(flux_surface, 95)
-
-    # -------------------------------
     # Fine grid interpolation
     # -------------------------------
-    LAT_FINE = 360*3
-    LON_FINE = 720*3
+    LAT_FINE = 180*3
+    LON_FINE = 360*3
 
     lat_fine = np.linspace(-90, 90, LAT_FINE)
-    lon_fine = np.linspace(0, 360, LON_FINE)
+    lon_fine = np.linspace(-180, 180, LON_FINE)
 
-    interp = RegularGridInterpolator(
+    interp2 = RegularGridInterpolator(
         (lat, lon),
         flux_surface,
         bounds_error=False,
@@ -149,22 +114,26 @@ for step in sim_steps:
 
     lon_grid_fine, lat_grid_fine = np.meshgrid(lon_fine, lat_fine)
     points_fine = np.column_stack((lat_grid_fine.ravel(), lon_grid_fine.ravel()))
-    flux_fine = interp(points_fine).reshape(LAT_FINE, LON_FINE)
+    flux_fine = interp2(points_fine).reshape(LAT_FINE, LON_FINE)
     flux_fine = flux_fine[::-1, :]
+
+    # Mask non-positive values
+    flux_surface_masked = np.where(flux_fine > 0, flux_fine, np.nan)
+
+    # Log10
+    log_flux_surface = np.log10(flux_surface_masked)
 
     # -------------------------------
     # Flatten
     # -------------------------------
     x_flat = lon_grid_fine.ravel()
     y_flat = lat_grid_fine.ravel()
-    z_flat = flux_fine.ravel()
+    z_flat = log_flux_surface.ravel()
 
-    # Apply -180° shift
-    lon_grid_fine_shifted = (lon_grid_fine - 180) % 360
-    x_flat_shifted = lon_grid_fine_shifted.ravel()
-
-    quick_cmax = 10e7
-    quick_cmin = -10e7
+    # c_min = np.nanpercentile(log_flux_surface, 5)
+    # c_max = np.nanpercentile(log_flux_surface, 95)
+    c_min = 4
+    c_max = 10
 
     # -------------------------------
     # 2D plot of everything
@@ -173,25 +142,25 @@ for step in sim_steps:
 
     # --- Scatter plot ---
     sc = ax.scatter(
-        x_flat_shifted,
+        x_flat,
         y_flat,
         c=z_flat,
         s=2,
         cmap="viridis",
-        vmin=quick_cmax,
-        vmax=quick_cmin
+        vmin=c_min,
+        vmax=c_max
     )
 
     # --- Colorbar ---
     cbar = fig.colorbar(sc, ax=ax)
-    cbar.set_label("Radial flux [cm$^{-2}$ s$^{-1}$]")
+    cbar.set_label("log$_{10}$(F) [cm$^{-2}$ s$^{-1}$]")
 
     # --- Vertical dashed lines ---
+    ax.axvline(-90, color="white", linewidth=2, linestyle="--")
     ax.axvline(90, color="white", linewidth=2, linestyle="--")
-    ax.axvline(270, color="white", linewidth=2, linestyle="--")
 
     # --- Axes settings ---
-    ax.set_xlim(0, 360)
+    ax.set_xlim(-180, 180)
     ax.set_ylim(-90, 90)
     ax.set_xlabel("Longitude [°]")
     ax.set_ylabel("Latitude [°]")

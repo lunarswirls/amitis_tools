@@ -6,9 +6,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+case = "CPN"
+
 # SETTINGS
-input_folder = "/Users/danywaller/Projects/mercury/extreme/CPS_Base/fig_yz/"
-out_folder = "/Users/danywaller/Projects/mercury/extreme/CPS_Base/slice_pdyn_yz/"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/fig_yz/"
+out_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/slice_pdyn_yz/"
 os.makedirs(out_folder, exist_ok=True)
 
 # proton mass (kg)
@@ -20,9 +22,9 @@ sim_steps = list(range(95000, 115000 + 1, 1000))
 for sim_step in sim_steps:
     filename = 'Base_' + "%06d" % sim_step
 
-    f = input_folder + "Amitis_CPS_" + filename + "_yz_comp.nc"
+    f = input_folder + f"Amitis_{case}_" + filename + "_yz_comp.nc"
 
-    print(f"Processing Amitis_CPS_{str(filename)}_yz_comp.nc ...")
+    print(f"Processing Amitis_{case}_{str(filename)}_yz_comp.nc ...")
 
     ds = xr.open_dataset(f)
 
@@ -75,11 +77,11 @@ for sim_step in sim_steps:
     ax.add_patch(circle)
     plt.xlabel(r"$\text{Y (R}_{M}\text{)}$")
     plt.ylabel(r"$\text{Z (R}_{M}\text{)}$")
-    plt.title(rf"$P_{{dyn}}$ at z = 0, t = {sim_step * 0.002:.3f} s")
+    plt.title(rf"{case} $P_{{dyn}}$ at z = 0, t = {sim_step * 0.002:.3f} s")
     plt.xlim([-5, 5])
     plt.ylim([-5, 5])
     plt.colorbar(label=r"$P_{dyn}$ [nPa]")
     plt.tight_layout()
-    fig_path = os.path.join(out_folder, f"cps_pdyn_{sim_step}.png")
+    fig_path = os.path.join(out_folder, f"{case}_pdyn_{sim_step}.png")
     plt.savefig(fig_path, dpi=300)
     plt.close()

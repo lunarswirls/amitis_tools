@@ -14,76 +14,9 @@ cases = ["RPS", "CPS", "RPN", "CPN"]
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 os.makedirs(output_folder, exist_ok=True)
 
-debug = False
-
 R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
-
-
-def compute_radial_flux(ds, x, y, z):
-    """
-    Compute radial particle flux F_r = n (v · r_hat)
-
-    """
-
-    # densities converted from cm^-3 to km^-3
-    den01 = ds["den01"].isel(time=0).values * 1e15
-    den02 = ds["den02"].isel(time=0).values * 1e15
-    den03 = ds["den03"].isel(time=0).values * 1e15
-    den04 = ds["den04"].isel(time=0).values * 1e15
-
-    # sum all densities to get total density
-    den_tot = (den01 + den02 + den03 + den04)
-
-    # density-weighted bulk velocity (km/s)
-    vx_bulk = np.zeros_like(den_tot)
-    vy_bulk = np.zeros_like(den_tot)
-    vz_bulk = np.zeros_like(den_tot)
-
-    # mask where total density is > 0
-    mask = den_tot > 0
-
-    vx_bulk[mask] = (den01[mask] * ds["vx01"].isel(time=0).values[mask] +
-                     den02[mask] * ds["vx02"].isel(time=0).values[mask] +
-                     den03[mask] * ds["vx03"].isel(time=0).values[mask] +
-                     den04[mask] * ds["vx04"].isel(time=0).values[mask]) / den_tot[mask]
-
-    vy_bulk[mask] = (den01[mask] * ds["vy01"].isel(time=0).values[mask] +
-                     den02[mask] * ds["vy02"].isel(time=0).values[mask] +
-                     den03[mask] * ds["vy03"].isel(time=0).values[mask] +
-                     den04[mask] * ds["vy04"].isel(time=0).values[mask]) / den_tot[mask]
-
-    vz_bulk[mask] = (den01[mask] * ds["vz01"].isel(time=0).values[mask] +
-                     den02[mask] * ds["vz02"].isel(time=0).values[mask] +
-                     den03[mask] * ds["vz03"].isel(time=0).values[mask] +
-                     den04[mask] * ds["vz04"].isel(time=0).values[mask]) / den_tot[mask]
-
-    # build position grids (Nz, Ny, Nx)
-    Zg, Yg, Xg = np.meshgrid(z, y, x, indexing="ij")
-
-    r_mag = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
-    mask_r = r_mag > 0
-
-    # Inward radial unit vector
-    nx = np.zeros_like(r_mag)
-    ny = np.zeros_like(r_mag)
-    nz = np.zeros_like(r_mag)
-
-    nx[mask_r] = -Xg[mask_r] / r_mag[mask_r]
-    ny[mask_r] = -Yg[mask_r] / r_mag[mask_r]
-    nz[mask_r] = -Zg[mask_r] / r_mag[mask_r]
-
-    # radial velocity [km/s]
-    v_dot_r = vx_bulk * nx + vy_bulk * ny + vz_bulk * nz
-
-    # weighted flux [km^-2 s^-1]
-    flux = den_tot * v_dot_r
-
-    # convert from km^-2 s^-1 to cm^-2 s^-1
-    flux *= 1e-10
-
-    return flux
 
 
 def lon_diff(a, b):
@@ -96,7 +29,7 @@ def lon_diff(a, b):
 def compute_open_fraction(
         df,
         lon0,
-        dlon=5.0,
+        dlon=2.0,
         lat_bins=np.linspace(0, 90, 91),
         hemisphere="north"
 ):
@@ -113,9 +46,9 @@ def compute_open_fraction(
     lon0 : float
         Target longitude (degrees) for the slice.
     dlon : float, optional
-        Width of longitude window around lon0 to select points (default 5.0 deg).
+        Width of longitude window around lon0 to select points (default 2.0 deg).
     lat_bins : array_like, optional
-        Array of latitude bin edges in degrees.
+        Array of latitude bin edges in degrees (default 0–90 deg in 0.5 deg steps).
     hemisphere : str, optional
         'north' or 'south' hemisphere to consider (default 'north').
 
@@ -149,7 +82,7 @@ def compute_open_fraction(
         return None, None
 
     # Boolean mask: True where the field line is classified as 'open'
-    open_mask = (sub["classification"] == "open").values
+    open_mask = (sub["median_classification"] == "open").values
 
     frac_open = []
     # Compute bin centers
@@ -199,8 +132,8 @@ def compute_ocb_transition(
     df,
     lon_bins,
     hemisphere="north",
-    threshold=0.5,
-    max_jump_deg=10.0
+    threshold=0.75,
+    max_jump_deg=15.0
 ):
     """
     Compute the open-closed boundary (OCB) transition latitude as a function of longitude.
@@ -264,15 +197,14 @@ def compute_ocb_transition(
 # -------------------------------
 # Prepare figure
 # -------------------------------
-fig, axs = plt.subplots(2, 2, figsize=(12, 8), subplot_kw={"projection": "hammer"})
+fig, axs = plt.subplots(2, 2, figsize=(12, 8))
 
 for case in cases:
 
     input_folder1  = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 
     input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
-    # csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # CSV with footprints
-    csv_file = os.path.join(input_folder2, f"{case}_115000_footprints_class.csv")  # CSV with footprints
+    csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # CSV with footprints
 
     # -------------------------------
     # Load footprint CSV
@@ -295,30 +227,32 @@ for case in cases:
     z = ds0["Nz"].values
 
     # -------------------------------
-    # Time-average total radial flux
+    # Time-average total density
     # -------------------------------
-    flux_sum = None
+    den_sum = None
     count = 0
 
     # Consider last N steps (adjust as needed)
-    sim_steps = range(115000, 115000 + 1, 1000)
+    sim_steps = range(106000, 115000 + 1, 1000)
 
     for step in sim_steps:
         nc_file = os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
         ds = xr.open_dataset(nc_file)
 
-        flux = compute_radial_flux(ds, x, y, z)
+        # Total density (protons + alphas) [units: cm^-3]
+        den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values + ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
 
-        if flux_sum is None:
-            flux_sum = np.zeros_like(flux, dtype=np.float64)
-        flux_sum += flux
+        if den_sum is None:
+            den_sum = np.zeros_like(den, dtype=np.float64)
+
+        den_sum += den
         count += 1
 
-    flux_avg = flux_sum / count
-    print(f"Computed time-averaged radial flux for {case}")
+    den_avg = den_sum / count
+    print(f"Computed time-averaged density for {case}")
 
     # -------------------------------
-    # Interpolate radial flux onto Mercury surface
+    # Interpolate onto Mercury surface
     # -------------------------------
     lat = np.linspace(-90, 90, LAT_BINS)
     lon = np.linspace(-180, 180, LON_BINS)
@@ -330,15 +264,18 @@ for case in cases:
     Zs = R_M * np.sin(lat_r[:, None]) * np.ones_like(lon_r[None, :])
 
     points_surface = np.stack((Zs, Ys, Xs), axis=-1).reshape(-1, 3)
-    interp = RegularGridInterpolator((z, y, x), flux_avg, bounds_error=False, fill_value=np.nan)
-    flux_surface = interp(points_surface).reshape(LAT_BINS, LON_BINS)
-    flux_surface = flux_surface[::-1, :]  # flip latitude for plotting
+    interp = RegularGridInterpolator((z, y, x), den_avg,
+                                     bounds_error=False,
+                                     fill_value=np.nan)
+
+    den_surface = interp(points_surface).reshape(LAT_BINS, LON_BINS)
+    den_surface = den_surface[::-1, :]  # flip latitude for plotting
 
     # Mask non-positive values
-    flux_surface_masked = np.where(flux_surface > 0, flux_surface, np.nan)
+    den_surface_masked = np.where(den_surface > 0, den_surface, np.nan)
 
-    # Log10
-    log_flux_surface = np.log10(flux_surface_masked)
+    # Log10 density
+    log_den_surface = np.log10(den_surface_masked)
 
     # -------------------------------
     # Plot
@@ -350,8 +287,8 @@ for case in cases:
 
     ax = axs[row, col]
 
-    quick_cmin = 6
-    quick_cmax = 8
+    quick_cmax = 100e6
+    quick_cmin = -150e6
 
     # Plot flux
     lon_grid, lat_grid = np.meshgrid(lon_r, lat_r)  # radians
@@ -359,17 +296,9 @@ for case in cases:
     lon_grid = np.where(lon_grid > np.pi, lon_grid - 2*np.pi, lon_grid)
 
     # Surface flux
-    sc = ax.pcolormesh(lon_grid, lat_grid, log_flux_surface, cmap="viridis", shading="auto", vmin=quick_cmin, vmax=quick_cmax)
-    cbar = fig.colorbar(sc, ax=ax, orientation="horizontal", pad=0.05, shrink=0.5)
-    cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
-
-    # Overlay footprints
-    if 0:
-        # for topo, color in [("closed", "blue"), ("open", "white")]:
-        for topo, color in [("open", "white")]:
-            subset = df_footprints[df_footprints['median_classification'] == topo]
-            if not subset.empty:
-                ax.scatter(subset['longitude_deg'], subset['latitude_deg'], s=1, color=color, facecolor=None, alpha=0.2)
+    sc = ax.pcolormesh(lon_grid, lat_grid, den_surface, cmap="RdBu", shading="auto")  #, vmin=quick_cmax, vmax=quick_cmin)
+    cbar = fig.colorbar(sc, ax=ax, orientation="horizontal", pad=0.1, shrink=0.5)
+    cbar.set_label(r"$\log_{10}$(N [cm$^{-3}$])")
 
     # Open–Closed Boundary (OCB)
     lon_bins = np.linspace(-180, 180, 180)
@@ -384,8 +313,8 @@ for case in cases:
 
     # Mollweide longitude in matplotlib goes from -pi to pi (radians)
     # Latitude stays as is
-    ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
-    ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
+    ax.plot(lon_n_rad, lat_n_rad, color="white", lw=2, label="OCB North")
+    ax.plot(lon_s_rad, lat_s_rad, color="white", lw=2, ls="--", label="OCB South")
 
     # Longitude ticks (-170 to 170 every n °)
     lon_ticks_deg = np.arange(-120, 121, 60)
@@ -404,10 +333,10 @@ for case in cases:
     ax.set_yticklabels([f"{int(l)}°" for l in lat_ticks_deg])
 
     ax.set_title(case)
-    ax.grid(True, alpha=0.3, color="grey")
+    ax.grid(True, alpha=0.3, color="black")
 
 # Save figure
 plt.tight_layout()
-outfile_png = os.path.join(output_folder, "all_cases_surface_flux_with_footprints_115000.png")
+outfile_png = os.path.join(output_folder, "all_cases_density_with_footprints.png")
 plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
 print("Saved figure:", outfile_png)

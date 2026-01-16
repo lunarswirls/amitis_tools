@@ -5,6 +5,7 @@ import os
 import numpy as np
 import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
+from src.surface_flux.flux_utils import compute_radial_flux
 import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
@@ -24,9 +25,9 @@ case = "RPN"
 # -------------------------------
 # Configuration
 # -------------------------------
-input_folder1  = f"/Users/danywaller/Projects/mercury/extreme_base/{case}_Base/object/"
-input_folder2 = f"/Users/danywaller/Projects/mercury/extreme_base/{case}_Base/object/"
-output_folder = f"/Users/danywaller/Projects/mercury/extreme_base/{case}_Base/surface_density/"
+input_folder1  = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
+input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/surface_density/"
 os.makedirs(output_folder, exist_ok=True)
 
 if 0:
@@ -35,7 +36,7 @@ if 0:
     else:
         sim_steps = range(98000, 115000 + 1, 1000)
 
-sim_steps = range(98000, 115000 + 1, 1000)
+sim_steps = range(115000, 115000 + 1, 1000)
 
 t_index = 0
 
@@ -62,37 +63,10 @@ flux_sum = None
 count = 0
 
 for step in sim_steps:
-    ds1 = xr.open_dataset(
-        os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
-    )
+    nc_file = os.path.join(input_folder1, f"Amitis_{case}_Base_{step:06d}_xz_comp.nc")
+    ds = xr.open_dataset(nc_file)
 
-    # Total density   # [units: cm^-3]
-    den = (ds1["den01"].isel(time=t_index).values + ds1["den02"].isel(time=t_index).values  # protons
-           + ds1["den03"].isel(time=t_index).values + ds1["den04"].isel(time=t_index).values)  # alphas
-
-    # Velocities   # [units: km/s]
-    vx = (ds1["vx01"].isel(time=t_index).values + ds1["vx02"].isel(time=t_index).values  # protons
-          + ds1["vx03"].isel(time=t_index).values + ds1["vx04"].isel(time=t_index).values)  # alphas
-    vy = (ds1["vy01"].isel(time=t_index).values + ds1["vy02"].isel(time=t_index).values
-          + ds1["vy03"].isel(time=t_index).values + ds1["vy04"].isel(time=t_index).values)
-    vz = (ds1["vz01"].isel(time=t_index).values + ds1["vz02"].isel(time=t_index).values
-          + ds1["vz03"].isel(time=t_index).values + ds1["vz04"].isel(time=t_index).values)
-
-    # Convert velocities from km/s to cm/s
-    vx_cms = vx * 1e5
-    vy_cms = vy * 1e5
-    vz_cms = vz * 1e5
-
-    # Radial unit vector at each grid point (same shape as den)
-    # Assuming grid points x,y,z already loaded from ds0
-    Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
-    r_mag = np.sqrt(Xg**2 + Yg**2 + Zg**2)
-    nx = Xg / r_mag
-    ny = Yg / r_mag
-    nz = Zg / r_mag
-
-    # Radial flux in cm^-2 s^-1
-    flux = den * (vx_cms * nx + vy_cms * ny + vz_cms * nz)
+    flux, vr = compute_radial_flux(ds, x, y, z)
 
     if flux_sum is None:
         flux_sum = np.zeros_like(flux, dtype=np.float64)
@@ -174,20 +148,26 @@ points_fine = np.column_stack((lat_grid_fine.ravel(), lon_grid_fine.ravel()))
 flux_fine = interp(points_fine).reshape(LAT_FINE, LON_FINE)
 flux_fine = flux_fine[::-1, :]
 
+# Mask non-positive values
+flux_surface_masked = np.where(flux_fine > 0, flux_fine, np.nan)
+
+# Log10
+log_flux_surface = np.log10(flux_surface_masked)
+
 # -------------------------------
 # Flatten
 # -------------------------------
 x_flat = lon_grid_fine.ravel()
 y_flat = lat_grid_fine.ravel()
-z_flat = flux_fine.ravel()
+z_flat = log_flux_surface.ravel()
 
 if quickplot:
     # Apply -180° shift
     lon_grid_fine_shifted = (lon_grid_fine - 180) % 360
     x_flat_shifted = lon_grid_fine_shifted.ravel()
 
-    quick_cmax = 100e6
-    quick_cmin = -150e6
+    c_min = np.nanpercentile(log_flux_surface, 5)
+    c_max = np.nanpercentile(log_flux_surface, 95)
 
     # -------------------------------
     # 2D plot of everything
@@ -203,9 +183,9 @@ if quickplot:
                 size=2,
                 color=z_flat,
                 colorscale="Viridis",
-                cmin=quick_cmin,
-                cmax=quick_cmax,
-                colorbar=dict(title="Radial flux<br>(cm^-2 s^-1)"),
+                cmin=c_min,
+                cmax=c_max,
+                colorbar=dict(title="log10(F)<br>(cm^-2 s^-1)"),
             ),
         ),
         row=1, col=1
@@ -314,11 +294,11 @@ else:
                     x=Xn,
                     y=Yn,
                     z=Zn,
-                    surfacecolor=flux_surface,
+                    surfacecolor=log_flux_surface,
                     colorscale="Viridis",
                     cmin=c_min,
                     cmax=c_max,
-                    colorbar=dict(title=f"Radial flux<br>(cm^-2 s^-1)", len=0.5,
+                    colorbar=dict(title=f"log10(F)<br>(cm^-2 s^-1)", len=0.5,
                                   x=0.65,  # move left of the plotting area
                                   y=0.5,  # center vertically
                                   ),
@@ -434,7 +414,7 @@ else:
                     colorscale="Viridis",
                     cmin=c_min,
                     cmax=c_max,
-                    colorbar=dict(title="Radial flux<br>(cm^-2 s^-1)", len=0.5,
+                    colorbar=dict(title="log10(F)<br>(cm^-2 s^-1)", len=0.5,
                                   x=0.5,  # move left of the plotting area
                                   y=0.5,  # center vertically
                                   ),
@@ -479,11 +459,11 @@ else:
                 x=Xn,
                 y=Yn,
                 z=Zn,
-                surfacecolor=flux_surface,
+                surfacecolor=log_flux_surface,
                 colorscale="Viridis",
                 cmin=c_min,
                 cmax=c_max,
-                colorbar=dict(title="Radial flux<br>(cm^-2 s^-1)"),
+                colorbar=dict(title="log10(F)<br>(cm^-2 s^-1)"),
             )
         )
 
