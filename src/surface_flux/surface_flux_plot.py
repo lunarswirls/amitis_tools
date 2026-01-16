@@ -56,6 +56,8 @@ x = ds0["Nx"].values  # [units: km]
 y = ds0["Ny"].values  # [units: km]
 z = ds0["Nz"].values  # [units: km]
 
+ds0.close()
+
 # -------------------------------
 # Time-averaged total radial flux (full volume)
 # -------------------------------
@@ -67,6 +69,8 @@ for step in sim_steps:
     ds = xr.open_dataset(nc_file)
 
     flux, vr = compute_radial_flux(ds, x, y, z)
+
+    ds.close()
 
     if flux_sum is None:
         flux_sum = np.zeros_like(flux, dtype=np.float64)

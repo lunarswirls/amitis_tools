@@ -6,6 +6,7 @@ import pandas as pd
 import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
+from src.field_topology.topology_utils import compute_ocb_transition
 
 # -------------------------------
 # Configuration
@@ -17,182 +18,6 @@ os.makedirs(output_folder, exist_ok=True)
 R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
-
-
-def lon_diff(a, b):
-    """
-    Minimal angular difference in degrees.
-    """
-    return np.abs(((a - b + 180) % 360) - 180)
-
-
-def compute_open_fraction(
-        df,
-        lon0,
-        dlon=2.0,
-        lat_bins=np.linspace(0, 90, 91),
-        hemisphere="north"
-):
-    """
-    Compute the fraction of open magnetic field lines as a function of latitude
-    for a given longitude slice.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame containing at least the columns:
-        'latitude_deg', 'longitude_deg', 'median_classification'.
-        'median_classification' should be one of 'open', 'closed', or 'solar_wind'.
-    lon0 : float
-        Target longitude (degrees) for the slice.
-    dlon : float, optional
-        Width of longitude window around lon0 to select points (default 2.0 deg).
-    lat_bins : array_like, optional
-        Array of latitude bin edges in degrees (default 0–90 deg in 0.5 deg steps).
-    hemisphere : str, optional
-        'north' or 'south' hemisphere to consider (default 'north').
-
-    Returns
-    -------
-    lat_centers : ndarray
-        Centers of latitude bins (degrees).
-    frac_open : ndarray
-        Fraction of open field lines in each latitude bin. NaN if insufficient points.
-
-    Notes
-    -----
-    - For the southern hemisphere, latitudes are mirrored to positive values
-      for consistent computation from pole toward equator.
-    - Bins with fewer than 3 points are assigned NaN.
-    """
-
-    # Select points near target longitude, accounting for periodicity
-    sub = df[np.abs(((df["longitude_deg"] - lon0 + 180) % 360) - 180) < dlon]
-
-    # Select hemisphere and mirror south latitudes to positive
-    if hemisphere == "north":
-        sub = sub[sub["latitude_deg"] > 0]
-        lat_vals = sub["latitude_deg"].values
-    else:
-        sub = sub[sub["latitude_deg"] < 0]
-        lat_vals = -sub["latitude_deg"].values  # mirror south for consistent handling
-
-    # Skip if too few points to compute a reliable fraction
-    if len(sub) < 10:
-        return None, None
-
-    # Boolean mask: True where the field line is classified as 'open'
-    open_mask = (sub["median_classification"] == "open").values
-
-    frac_open = []
-    # Compute bin centers
-    lat_centers = 0.5 * (lat_bins[:-1] + lat_bins[1:])
-
-    # Loop over latitude bins
-    for lo, hi in zip(lat_bins[:-1], lat_bins[1:]):
-        mask = (lat_vals >= lo) & (lat_vals < hi)
-        if np.sum(mask) < 3:
-            # Insufficient points → NaN
-            frac_open.append(np.nan)
-        else:
-            # Fraction of points in bin classified as 'open'
-            frac_open.append(np.mean(open_mask[mask]))
-
-    return lat_centers, np.array(frac_open)
-
-
-def find_transition_lat(lat, frac_open, threshold):
-    """
-    Find the latitude where topology transitions from open to closed
-    when scanning equatorward.
-    """
-    valid = np.isfinite(frac_open)
-    lat = lat[valid]
-    frac_open = frac_open[valid]
-
-    if len(lat) < 5:
-        return None
-
-    # sort from pole → equator
-    order = np.argsort(lat)[::-1]
-    lat = lat[order]
-    frac_open = frac_open[order]
-
-    for i in range(1, len(lat)):
-        if frac_open[i-1] >= threshold and frac_open[i] < threshold:
-            # linear interpolation
-            w = ((threshold - frac_open[i-1]) /
-                 (frac_open[i] - frac_open[i-1]))
-            return lat[i-1] + w * (lat[i] - lat[i-1])
-
-    return None
-
-
-def compute_ocb_transition(
-    df,
-    lon_bins,
-    hemisphere="north",
-    threshold=0.75,
-    max_jump_deg=15.0
-):
-    """
-    Compute the open-closed boundary (OCB) transition latitude as a function of longitude.
-
-    Scans equatorward from the pole to find where the fraction of open field lines
-    drops below the threshold. If a computed boundary point jumps more than `max_jump_deg`
-    toward the pole relative to the previous point, the previous latitude is reused.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        DataFrame with columns 'latitude_deg', 'longitude_deg', 'median_classification'.
-    lon_bins : array-like
-        Longitudes (deg) at which to compute the boundary.
-    hemisphere : {'north', 'south'}
-        Hemisphere to compute.
-    threshold : float
-        Fraction of open field lines defining the transition.
-    max_jump_deg : float
-        Maximum allowed poleward jump in latitude between neighboring points along the boundary.
-
-    Returns
-    -------
-    lons : ndarray
-        Longitudes of boundary points.
-    lats : ndarray
-        Latitudes of boundary points.
-    """
-
-    lons_all = []
-    lats_all = []
-
-    prev_lat = None
-
-    for lon0 in lon_bins:
-        lat_c, frac_open = compute_open_fraction(df, lon0, hemisphere=hemisphere)
-        if lat_c is None:
-            continue
-
-        lat_b = find_transition_lat(lat_c, frac_open, threshold)
-        if lat_b is None:
-            continue
-
-        if hemisphere == "south":
-            lat_b = -lat_b
-
-        # If previous latitude exists, check poleward jump
-        if prev_lat is not None:
-            jump = lat_b - prev_lat if hemisphere == "north" else prev_lat - lat_b
-            if jump > max_jump_deg:
-                # Reject jump: use previous value
-                lat_b = prev_lat
-
-        lons_all.append(lon0)
-        lats_all.append(lat_b)
-        prev_lat = lat_b
-
-    return np.array(lons_all), np.array(lats_all)
-
 
 # -------------------------------
 # Prepare figure
@@ -226,6 +51,8 @@ for case in cases:
     y = ds0["Ny"].values
     z = ds0["Nz"].values
 
+    ds0.close()
+
     # -------------------------------
     # Time-average total density
     # -------------------------------
@@ -241,6 +68,8 @@ for case in cases:
 
         # Total density (protons + alphas) [units: cm^-3]
         den = (ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values + ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values)
+
+        ds.close()
 
         if den_sum is None:
             den_sum = np.zeros_like(den, dtype=np.float64)

@@ -4,16 +4,14 @@ import os
 import numpy as np
 import pandas as pd
 import xarray as xr
-from numba import njit
+from src.field_topology.topology_utils import *
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 import matplotlib.lines as mlines
 
 debug = False
 
-# --------------------------
 # SETTINGS
-# --------------------------
 case = "RPS"
 input_folder_xy = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xy/"
 input_folder_xz = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xz/"
@@ -39,108 +37,7 @@ all_files = sorted([f for f in os.listdir(input_folder_xz) if f.endswith("_xz_co
 last_files = all_files[-N_files:]
 print(f"Processing last {len(last_files)} files: {last_files}")
 
-# --------------------------
-# Numba functions
-# --------------------------
-@njit
-def trilinear_interp(x_grid, y_grid, z_grid, B, xi, yi, zi):
-    i = np.searchsorted(x_grid, xi) - 1
-    j = np.searchsorted(y_grid, yi) - 1
-    k = np.searchsorted(z_grid, zi) - 1
-    i = max(0, min(i, len(x_grid)-2))
-    j = max(0, min(j, len(y_grid)-2))
-    k = max(0, min(k, len(z_grid)-2))
-    xd = (xi - x_grid[i]) / (x_grid[i+1]-x_grid[i])
-    yd = (yi - y_grid[j]) / (y_grid[j+1]-y_grid[j])
-    zd = (zi - z_grid[k]) / (z_grid[k+1]-z_grid[k])
-    c000 = B[i,j,k]
-    c100 = B[i+1,j,k]
-    c010 = B[i,j+1,k]
-    c001 = B[i,j,k+1]
-    c101 = B[i+1,j,k+1]
-    c011 = B[i,j+1,k+1]
-    c110 = B[i+1,j+1,k]
-    c111 = B[i+1,j+1,k+1]
-    c00 = c000*(1-xd)+c100*xd
-    c01 = c001*(1-xd)+c101*xd
-    c10 = c010*(1-xd)+c110*xd
-    c11 = c011*(1-xd)+c111*xd
-    c0 = c00*(1-yd)+c10*yd
-    c1 = c01*(1-yd)+c11*yd
-    return c0*(1-zd)+c1*zd
-
-@njit
-def get_B(r, Bx, By, Bz, x_grid, y_grid, z_grid):
-    bx = trilinear_interp(x_grid, y_grid, z_grid, Bx, r[0], r[1], r[2])
-    by = trilinear_interp(x_grid, y_grid, z_grid, By, r[0], r[1], r[2])
-    bz = trilinear_interp(x_grid, y_grid, z_grid, Bz, r[0], r[1], r[2])
-    B = np.array([bx, by, bz])
-    norm = np.linalg.norm(B)
-    if norm == 0.0:
-        return np.zeros(3)
-    return B / norm
-
-@njit
-def cartesian_to_latlon(r):
-    rmag = np.linalg.norm(r)
-    lat = np.degrees(np.arcsin(r[2]/rmag))
-    lon = np.degrees(np.arctan2(r[1], r[0]))
-    return lat, lon
-
-@njit
-def rk45_step(f, r, h, Bx, By, Bz, x_grid, y_grid, z_grid):
-    k1 = f(r, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k2 = f(r + h*k1*0.25, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k3 = f(r + h*(3*k1+9*k2)/32, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k4 = f(r + h*(1932*k1 - 7200*k2 + 7296*k3)/2197, Bx, By, Bz, x_grid, y_grid, z_grid)
-    k5 = f(r + h*(439*k1/216 - 8*k2 + 3680*k3/513 - 845*k4/4104), Bx, By, Bz, x_grid, y_grid, z_grid)
-    k6 = f(r + h*(-8*k1/27 + 2*k2 - 3544*k3/2565 + 1859*k4/4104 - 11*k5/40), Bx, By, Bz, x_grid, y_grid, z_grid)
-    r_next = r + h*(16*k1/135 + 6656*k3/12825 + 28561*k4/56430 - 9*k5/50 + 2*k6/55)
-    return r_next
-
-@njit
-def trace_field_line_rk(seed, Bx, By, Bz, x_grid, y_grid, z_grid, RM, max_steps=5000, h=50.0, surface_tol=-1.0):
-    traj = np.empty((max_steps, 3), dtype=np.float64)
-    traj[0] = seed
-    r = seed.copy()
-    exit_y_boundary = False
-    for i in range(1, max_steps):
-        B = get_B(r, Bx, By, Bz, x_grid, y_grid, z_grid)
-        if np.all(B == 0.0):
-            return traj[:i], exit_y_boundary
-        r_next = rk45_step(get_B, r, h, Bx, By, Bz, x_grid, y_grid, z_grid)
-        traj[i] = r_next
-        r = r_next
-        if np.linalg.norm(r) <= RM + surface_tol:
-            return traj[:i+1], exit_y_boundary
-        if (r[0]<x_grid[0] or r[0]>x_grid[-1] or
-            r[2]<z_grid[0] or r[2]>z_grid[-1]):
-            return traj[:i+1], exit_y_boundary
-        if r[1]<y_grid[0] or r[1]>y_grid[-1]:
-            exit_y_boundary = True
-            return traj[:i+1], exit_y_boundary
-    return traj, exit_y_boundary
-
-@njit
-def classify(traj_fwd, traj_bwd, RM, exit_fwd_y=False, exit_bwd_y=False):
-    # check if last point in trajectory is equal to or less than Mercury radius
-    hit_fwd = np.linalg.norm(traj_fwd[-1]) <= RM
-    hit_bwd = np.linalg.norm(traj_bwd[-1]) <= RM
-    if exit_fwd_y or exit_bwd_y:
-        # line ran into domain boundary - terminate as unknown
-        return "TBD"
-    if hit_fwd and hit_bwd:
-        # line originated from and returned to planet surface - closed
-        return "closed"
-    elif hit_fwd or hit_bwd:
-        # line connected to planet surface at only ONE end - open
-        return "open"
-    else:
-        return "TBD"
-
-# --------------------------
 # CREATE SURFACE SEEDS
-# --------------------------
 lats_surface = np.linspace(-90, 90, n_lat)
 lons_surface = np.linspace(-180, 180, n_lon)
 seeds = []
@@ -154,9 +51,7 @@ for lat in lats_surface:
         seeds.append(np.array([x_s, y_s, z_s]))
 seeds = np.array(seeds)
 
-# --------------------------
 # FUNCTION TO MERGE PLANES FOR ONE FILE
-# --------------------------
 def load_merged_field(file_basename):
     """
     Load XY, XZ, YZ planes and merge to cover maximum extent.
@@ -225,9 +120,7 @@ def load_merged_field(file_basename):
     ds_yz.close()
     return x_grid, y_grid, z_grid, Bx_full, By_full, Bz_full
 
-# --------------------------
 # LOOP OVER FILES
-# --------------------------
 all_footprints = []
 
 for ncfile in last_files:
@@ -342,9 +235,7 @@ for ncfile in last_files:
     print("Saved:\t", os.path.join(output_ftpt, f"{case}_field_footprints_{step}.png"))
     plt.close()
 
-# --------------------------
 # AGGREGATE ALL FOOTPRINTS
-# --------------------------
 df_all = pd.concat(all_footprints, ignore_index=True)
 df_all["lat_round"] = df_all["latitude_deg"].round(3)
 df_all["lon_round"] = df_all["longitude_deg"].round(3)

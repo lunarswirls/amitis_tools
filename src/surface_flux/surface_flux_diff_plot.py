@@ -42,6 +42,8 @@ x = ds0["Nx"].values  # [units: km]
 y = ds0["Ny"].values  # [units: km]
 z = ds0["Nz"].values  # [units: km]
 
+ds0.close()
+
 # -------------------------------
 # Time-averaged total radial flux (full volume)
 # -------------------------------

@@ -9,52 +9,26 @@ import matplotlib.pyplot as plt
 from src.surface_flux.flux_utils import compute_radial_flux
 from src.field_topology.topology_utils import compute_ocb_transition
 
-# -------------------------------
-# Configuration
-# -------------------------------
+# SETTINGS
 cases = ["RPS", "CPS", "RPN", "CPN"]
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 os.makedirs(output_folder, exist_ok=True)
 
 debug = False
+add_footprints = True
 
 R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
 
-
-def lon_diff(a, b):
-    """
-    Minimal angular difference in degrees.
-    """
-    return np.abs(((a - b + 180) % 360) - 180)
-
-# -------------------------------
 # Prepare figure
-# -------------------------------
 fig, axs = plt.subplots(2, 2, figsize=(12, 8), subplot_kw={"projection": "hammer"})
 
 for case in cases:
 
     input_folder1  = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 
-    input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
-    # csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # CSV with footprints
-    csv_file = os.path.join(input_folder2, f"{case}_115000_footprints_class.csv")  # CSV with footprints
-
-    # -------------------------------
-    # Load footprint CSV
-    # -------------------------------
-    if os.path.exists(csv_file):
-        df_footprints = pd.read_csv(csv_file)
-        # print(f"Loaded {len(df_footprints)} footprints for {case}")
-    else:
-        print(f"No footprint CSV found for {case}, skipping footprints")
-        df_footprints = pd.DataFrame(columns=["latitude_deg", "longitude_deg", "classification"])
-
-    # -------------------------------
     # Load grid (assume first file is representative)
-    # -------------------------------
     first_file = sorted([f for f in os.listdir(input_folder1) if f.endswith("_xz_comp.nc")])[0]
     ds0 = xr.open_dataset(os.path.join(input_folder1, first_file))
 
@@ -62,9 +36,9 @@ for case in cases:
     y = ds0["Ny"].values
     z = ds0["Nz"].values
 
-    # -------------------------------
+    ds0.close()
+
     # Time-average total radial flux
-    # -------------------------------
     flux_sum = None
     count = 0
 
@@ -77,6 +51,8 @@ for case in cases:
 
         flux, vr = compute_radial_flux(ds, x, y, z)
 
+        ds.close()
+
         if flux_sum is None:
             flux_sum = np.zeros_like(flux, dtype=np.float64)
         flux_sum += flux
@@ -85,9 +61,7 @@ for case in cases:
     flux_avg = flux_sum / count
     print(f"Computed time-averaged radial flux for {case}")
 
-    # -------------------------------
     # Interpolate radial flux onto Mercury surface
-    # -------------------------------
     lat = np.linspace(-90, 90, LAT_BINS)
     lon = np.linspace(-180, 180, LON_BINS)
 
@@ -108,9 +82,7 @@ for case in cases:
     # Log10
     log_flux_surface = np.log10(flux_surface_masked)
 
-    # -------------------------------
     # Plot
-    # -------------------------------
     if case == "RPN": row, col = 0, 0
     elif case == "CPN": row, col = 1, 0
     elif case == "RPS": row, col = 0, 1
@@ -131,21 +103,32 @@ for case in cases:
     cbar = fig.colorbar(sc, ax=ax, orientation="horizontal", pad=0.05, shrink=0.5)
     cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
 
-    # Open–Closed Boundary (OCB)
-    lon_bins = np.linspace(-180, 180, 180)
-    lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
-    lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
+    if add_footprints:
+        input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+        # csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # median CSV with footprints
+        csv_file = os.path.join(input_folder2, f"{case}_115000_footprints_class.csv")  # single timestep CSV with footprints
 
-    # Convert to radians for Mollweide
-    lon_n_rad = np.deg2rad(lon_n)
-    lat_n_rad = np.deg2rad(lat_n)
-    lon_s_rad = np.deg2rad(lon_s)
-    lat_s_rad = np.deg2rad(lat_s)
+        # Load footprint CSV
+        if os.path.exists(csv_file):
+            df_footprints = pd.read_csv(csv_file)
+            print(f"Loaded {len(df_footprints)} footprints for {case}")
+        else:
+            print(f"No footprint CSV found for {case}, skipping footprints")
+            df_footprints = pd.DataFrame(columns=["latitude_deg", "longitude_deg", "classification"])
 
-    # Mollweide longitude in matplotlib goes from -pi to pi (radians)
-    # Latitude stays as is
-    ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
-    ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
+        # Open–Closed Boundary (OCB)
+        lon_bins = np.linspace(-180, 180, 180)
+        lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
+        lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
+
+        # Mollweide/Hammer longitude in matplotlib goes from -pi to pi (radians)
+        lon_n_rad = np.deg2rad(lon_n)
+        lat_n_rad = np.deg2rad(lat_n)
+        lon_s_rad = np.deg2rad(lon_s)
+        lat_s_rad = np.deg2rad(lat_s)
+
+        ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
+        ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
 
     # Longitude ticks (-170 to 170 every n °)
     lon_ticks_deg = np.arange(-120, 121, 60)
@@ -168,6 +151,9 @@ for case in cases:
 
 # Save figure
 plt.tight_layout()
-outfile_png = os.path.join(output_folder, "all_cases_surface_flux_with_footprints_115000.png")
+if add_footprints:
+    outfile_png = os.path.join(output_folder, "all_cases_surface_flux_with_footprints_115000.png")
+else:
+    outfile_png = os.path.join(output_folder, "all_cases_surface_flux_1150000.png")
 plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
 print("Saved figure:", outfile_png)

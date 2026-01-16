@@ -13,9 +13,7 @@ from src.field_topology.topology_utils import *
 debug = False
 make_plots = True
 
-# --------------------------
 # SETTINGS
-# --------------------------
 case = "RPS"
 input_folder = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/object/"
 ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000_xz_comp.nc")
@@ -44,9 +42,7 @@ n_lon = n_lat*2
 max_steps = 100000
 h_step = 50.0
 
-# --------------------------
 # CREATE SURFACE SEEDS
-# --------------------------
 lats_surface = np.linspace(-90, 90, n_lat)
 lons_surface = np.linspace(-180, 180, n_lon)
 seeds = []
@@ -60,18 +56,16 @@ for lat in lats_surface:
         seeds.append(np.array([x_s, y_s, z_s]))
 seeds = np.array(seeds)
 
-# --------------------------
-# FUNCTION TO MERGE PLANES FOR ONE FILE
-# --------------------------
-def load_full_domain(ncfile, xlim=[None, None], ylim=[None, None], zlim=[None, None]):
+
+def load_jvector(ncfile, xlim=[None, None], ylim=[None, None], zlim=[None, None]):
     """
-    Load full 3D current field from a single NetCDF file.
+    Load 3D current field from a NetCDF file that covers the full domain.
 
     Can optionally be cropped by xlim, ylim, zlim, defaults are [None, None]
 
     Returns:
         x, y, z : 1D coordinate arrays
-        Jx, Jy, Jz : 3D arrays with shape (Nz, Ny, Nx)
+        Jx, Jy, Jz : 3D arrays with shape (Nx, Ny, Nz)
     """
     xmin, xmax = xlim
     ymin, ymax = ylim
@@ -135,7 +129,7 @@ def load_full_domain(ncfile, xlim=[None, None], ylim=[None, None], zlim=[None, N
     return plot_x, plot_y, plot_z, Jx_masked, Jy_masked, Jz_masked
 
 
-x, y, z, Jx, Jy, Jz = load_full_domain(ncfile)
+x, y, z, Jx, Jy, Jz = load_jvector(ncfile)
 step = int(ncfile.split("/")[-1].split("_")[3].split(".")[0])
 
 # Compute footprints
@@ -232,8 +226,8 @@ if make_plots:
     # Apply to the current axis
     ax.set_xticks(lon_ticks_rad)
     ax.set_yticks(lat_ticks_rad)
-    ax.set_xlabel("Longitude")
-    ax.set_ylabel("Latitude")
+    ax.set_xlabel("Longitude [°]")
+    ax.set_ylabel("Latitude [°]")
     ax.set_title(f"{case} Current Footprints, t = {step * 0.002} s")
     ax.grid(True)
     ax.legend(loc='lower left')

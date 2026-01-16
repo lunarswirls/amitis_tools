@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 # -------------------------------
 # Configuration
 # -------------------------------
-
-case = "CPS"
+case = "RPS"
 
 # input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 # output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
@@ -39,6 +38,8 @@ x = ds0["Nx"].values  # [units: km]
 y = ds0["Ny"].values  # [units: km]
 z = ds0["Nz"].values  # [units: km]
 
+ds0.close()
+
 # take last 10-ish seconds
 # sim_steps = range(98000, 115000 + 1, 1000)
 sim_steps = range(115000, 350000 + 1, 1000)
@@ -50,6 +51,8 @@ for step in sim_steps:
     ds = xr.open_dataset(nc_file)
 
     flux, vr = compute_radial_flux(ds, x, y, z)
+
+    ds.close()
 
     # -------------------------------
     # Interpolator (Cartesian space)
