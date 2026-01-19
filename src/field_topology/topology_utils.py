@@ -237,7 +237,7 @@ def compute_ocb_transition(df, lon_bins, hemisphere="north", threshold=0.5, max_
     drops below the threshold. If a computed boundary point jumps more than `max_jump_deg`
     toward the pole relative to the previous point, the previous latitude is reused.
 
-    :param pd.DataFrame df: DataFrame with columns 'latitude_deg', 'longitude_deg', 'median_classification'.
+    :param pd.DataFrame df: DataFrame with columns 'latitude_deg', 'longitude_deg', 'classification'.
     :param lon_bins: array-like input of longitudes (deg) at which to compute the boundary.
     :param str hemisphere: Hemisphere to compute {'north', 'south'}
     :param float threshold: Fraction of open field lines defining the transition.
@@ -275,3 +275,161 @@ def compute_ocb_transition(df, lon_bins, hemisphere="north", threshold=0.5, max_
         prev_lat = lat_b
 
     return np.array(lons_all), np.array(lats_all)
+
+
+def ocb_curve_df(df, lon_bins):
+    """
+    Calculates north and south OCB curves and outputs to df.
+    """
+
+    lon_n, lat_n = compute_ocb_transition(df, lon_bins, hemisphere="north")
+    lon_s, lat_s = compute_ocb_transition(df, lon_bins, hemisphere="south")
+
+    records = []
+
+    for lon, lat in zip(lon_n, lat_n):
+        records.append({
+            "hemisphere": "north",
+            "longitude_deg": lon,
+            "ocb_latitude_deg": lat,
+        })
+
+    for lon, lat in zip(lon_s, lat_s):
+        records.append({
+            "hemisphere": "south",
+            "longitude_deg": lon,
+            "ocb_latitude_deg": lat,
+        })
+
+    df_ocb = pd.DataFrame.from_records(records)
+
+    return df_ocb
+
+
+def compute_connectedness_index(df):
+    """
+    Scalar connectedness index: fraction of open field lines
+    among valid (open + closed) surface connections.
+    """
+    valid = df[df["classification"].isin(["open", "closed"])]
+    if len(valid) == 0:
+        return np.nan
+
+    return np.mean(valid["classification"] == "open")
+
+
+def summarize_ocb(df_ocb, planet_radius_km=2440.0):
+    """
+    Summarize OCB geometry, polar-cap areas, and asymmetry for north/south hemispheres.
+
+    Parameters
+    ----------
+    df_ocb : pandas.DataFrame
+        Output of ocb_curve_df with columns:
+        ['hemisphere', 'longitude_deg', 'ocb_latitude_deg']
+    planet_radius_km : float
+        Planet radius for area computation [km]
+
+    Returns
+    -------
+    pandas.DataFrame
+        Single-row DataFrame containing OCB metrics, polar-cap areas,
+        and north–south asymmetry indices.
+    """
+
+    results = {}
+    areas = {}
+
+    for hemi in ("north", "south"):
+        sub = df_ocb[df_ocb["hemisphere"] == hemi]
+
+        if sub.shape[0] < 5:
+            for key in (
+                "mean_lat", "min_lat", "max_lat", "std_lat",
+                "eccentricity",
+                "lon_min", "lon_max", "lon_std",
+                "polar_cap_area_km2",
+            ):
+                results[f"ocb_{hemi}_{key}"] = np.nan
+            areas[hemi] = np.nan
+            continue
+
+        lon = sub["longitude_deg"].to_numpy(dtype=float)
+        lat = sub["ocb_latitude_deg"].to_numpy(dtype=float)
+
+        # --------------------------
+        # Latitude statistics
+        # --------------------------
+        lat_mean = np.nanmean(lat)
+        lat_min = np.nanmin(lat)
+        lat_max = np.nanmax(lat)
+        lat_std = np.nanstd(lat)
+
+        # Eccentricity: elongation proxy (0 → circular)
+        denom = abs(lat_max) + abs(lat_min)
+        eccentricity = (abs(lat_max) - abs(lat_min)) / denom if denom != 0 else np.nan
+
+        # --------------------------
+        # Longitude statistics (circular)
+        # --------------------------
+        lon_rad = np.deg2rad(lon)
+        sin_m = np.nanmean(np.sin(lon_rad))
+        cos_m = np.nanmean(np.cos(lon_rad))
+        R = np.sqrt(sin_m**2 + cos_m**2)
+        lon_std = np.sqrt(-2.0 * np.log(R)) * (180.0 / np.pi) if R > 0 else np.nan
+        lon_min = np.nanmin(lon)
+        lon_max = np.nanmax(lon)
+
+        # --------------------------
+        # Polar-cap area (numerical integration)
+        # --------------------------
+        lat_rad = np.deg2rad(lat)
+
+        # Sort by longitude to integrate properly
+        sort_idx = np.argsort(lon_rad)
+        lon_rad_sorted = lon_rad[sort_idx]
+        lat_rad_sorted = lat_rad[sort_idx]
+
+        # Ensure the curve wraps around longitude
+        lon_full = np.append(lon_rad_sorted, lon_rad_sorted[0] + 2 * np.pi)
+        lat_full = np.append(lat_rad_sorted, lat_rad_sorted[0])
+
+        # Differential area along longitude
+        dlon = np.diff(lon_full)
+        area = np.sum((1 - np.sin(lat_full[:-1])) * dlon) * planet_radius_km**2
+        areas[hemi] = area
+
+        # --------------------------
+        # Store results
+        # --------------------------
+        results.update({
+            f"ocb_{hemi}_mean_lat": lat_mean,
+            f"ocb_{hemi}_min_lat": lat_min,
+            f"ocb_{hemi}_max_lat": lat_max,
+            f"ocb_{hemi}_std_lat": lat_std,
+            f"ocb_{hemi}_eccentricity": eccentricity,
+            f"ocb_{hemi}_lon_min": lon_min,
+            f"ocb_{hemi}_lon_max": lon_max,
+            f"ocb_{hemi}_lon_std": lon_std,
+            f"ocb_{hemi}_polar_cap_area_km2": area,
+        })
+
+    # --------------------------
+    # North–south asymmetry indices
+    # --------------------------
+    if np.isfinite(areas.get("north")) and np.isfinite(areas.get("south")):
+        results["polar_cap_area_asymmetry"] = (
+            areas["north"] - areas["south"]
+        ) / (areas["north"] + areas["south"])
+    else:
+        results["polar_cap_area_asymmetry"] = np.nan
+
+    lat_n = results.get("ocb_north_mean_lat", np.nan)
+    lat_s = results.get("ocb_south_mean_lat", np.nan)
+    if np.isfinite(lat_n) and np.isfinite(lat_s):
+        results["mean_lat_asymmetry"] = (lat_n - abs(lat_s)) / (lat_n + abs(lat_s))
+    else:
+        results["mean_lat_asymmetry"] = np.nan
+
+    return pd.DataFrame([results])
+

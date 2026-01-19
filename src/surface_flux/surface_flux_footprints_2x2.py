@@ -6,6 +6,7 @@ import pandas as pd
 import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from src.surface_flux.flux_utils import compute_radial_flux
 from src.field_topology.topology_utils import compute_ocb_transition
 
@@ -15,11 +16,29 @@ output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 os.makedirs(output_folder, exist_ok=True)
 
 debug = False
-add_footprints = True
+morph_map = False
+footprints = "add"  # valid arguments: 'compute', 'add', or None
 
 R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
+
+if morph_map:
+    # Load equirectangular Mercury surface image
+    mercury_img_path = "/Users/danywaller/Downloads/MDIS_Monochrome_20170512_PDS16_64ppd_equirectangular.png"
+    img = mpimg.imread(mercury_img_path)
+
+    # If grayscale, add a fake RGB dimension
+    if img.ndim == 2:
+        img = np.stack([img]*3, axis=-1)  # shape becomes (ny, nx, 3)
+
+    ny, nx, _ = img.shape
+
+    # Create longitude/latitude arrays for each pixel
+    im_lon = np.linspace(-np.pi, np.pi, nx)        # -180° to 180° in radians
+    im_lat = np.linspace(-np.pi/2, np.pi/2, ny)   # -90° to 90° in radians
+
+    imlon_grid, imlat_grid = np.meshgrid(im_lon, im_lat)
 
 # Prepare figure
 fig, axs = plt.subplots(2, 2, figsize=(12, 8), subplot_kw={"projection": "hammer"})
@@ -98,15 +117,24 @@ for case in cases:
     # shift lon to [-pi, pi]
     lon_grid = np.where(lon_grid > np.pi, lon_grid - 2*np.pi, lon_grid)
 
+    if morph_map:
+        # basemap
+        ax.pcolormesh(imlon_grid, imlat_grid, np.flipud(img[:, :, :3]), shading='auto', zorder=0)
+
     # Surface flux
     sc = ax.pcolormesh(lon_grid, lat_grid, log_flux_surface, cmap="viridis", shading="auto", vmin=quick_cmin, vmax=quick_cmax)
     cbar = fig.colorbar(sc, ax=ax, orientation="horizontal", pad=0.05, shrink=0.5)
     cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
 
-    if add_footprints:
+    if footprints is not None:
         input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
-        # csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # median CSV with footprints
-        csv_file = os.path.join(input_folder2, f"{case}_115000_footprints_class.csv")  # single timestep CSV with footprints
+        if footprints == 'compute':
+            # csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # median CSV with footprints
+            csv_file = os.path.join(input_folder2, f"{case}_115000_footprints_class.csv")  # single timestep CSV with footprints
+        elif footprints == 'add':
+            csv_file = os.path.join(input_folder2, f"{case}_115000_ocb_curve.csv")  # single timestep CSV with OCB curve
+        else:
+            raise ValueError("Check footprint argument! If not None, should be 'compute' or 'add'")
 
         # Load footprint CSV
         if os.path.exists(csv_file):
@@ -116,19 +144,35 @@ for case in cases:
             print(f"No footprint CSV found for {case}, skipping footprints")
             df_footprints = pd.DataFrame(columns=["latitude_deg", "longitude_deg", "classification"])
 
-        # Open–Closed Boundary (OCB)
-        lon_bins = np.linspace(-180, 180, 180)
-        lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
-        lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
+        if footprints == 'compute':
+            # Open–Closed Boundary (OCB)
+            lon_bins = np.linspace(-180, 180, 180)
+            lon_n, lat_n = compute_ocb_transition(df_footprints, lon_bins, "north")
+            lon_s, lat_s = compute_ocb_transition(df_footprints, lon_bins, "south")
 
-        # Mollweide/Hammer longitude in matplotlib goes from -pi to pi (radians)
-        lon_n_rad = np.deg2rad(lon_n)
-        lat_n_rad = np.deg2rad(lat_n)
-        lon_s_rad = np.deg2rad(lon_s)
-        lat_s_rad = np.deg2rad(lat_s)
+            # Mollweide/Hammer longitude in matplotlib goes from -pi to pi (radians)
+            lon_n_rad = np.deg2rad(lon_n)
+            lat_n_rad = np.deg2rad(lat_n)
+            lon_s_rad = np.deg2rad(lon_s)
+            lat_s_rad = np.deg2rad(lat_s)
 
-        ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
-        ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
+            ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
+            ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
+        elif footprints == 'add':
+            # Split north and south hemispheres
+            df_north = df_footprints[df_footprints["hemisphere"] == "north"]
+            df_south = df_footprints[df_footprints["hemisphere"] == "south"]
+
+            # Convert to radians for Mollweide/Hammer projection
+            lon_n_rad = np.deg2rad(df_north["longitude_deg"])
+            lat_n_rad = np.deg2rad(df_north["ocb_latitude_deg"])
+
+            lon_s_rad = np.deg2rad(df_south["longitude_deg"])
+            lat_s_rad = np.deg2rad(df_south["ocb_latitude_deg"])
+
+            # Plot
+            ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
+            ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
 
     # Longitude ticks (-170 to 170 every n °)
     lon_ticks_deg = np.arange(-120, 121, 60)
@@ -151,9 +195,13 @@ for case in cases:
 
 # Save figure
 plt.tight_layout()
-if add_footprints:
-    outfile_png = os.path.join(output_folder, "all_cases_surface_flux_with_footprints_115000.png")
+if footprints is not None:
+    outfile_png = os.path.join(output_folder, "all_cases_surface_flux_OCB_115000.png")
 else:
     outfile_png = os.path.join(output_folder, "all_cases_surface_flux_1150000.png")
+
+if morph_map:
+    outfile_png = outfile_png.replace("all_", "morph_map_all_")
+
 plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
 print("Saved figure:", outfile_png)

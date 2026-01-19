@@ -11,20 +11,24 @@ import matplotlib.lines as mlines
 from src.field_topology.topology_utils import *
 
 debug = False
-make_plots = True
+make_plots = False
 
 # --------------------------
 # SETTINGS
 # --------------------------
 case = "RPS"
-input_folder = f"/Volumes/data_backup/extreme_base/{case}_Base/05/out/"
+input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/05/out/"
 ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000.nc")
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
 os.makedirs(output_folder, exist_ok=True)
 
 # Planet parameters
-RM = 2440.0          # Mercury radius [km]
+if case in ["RPN", "RPS"]:
+    RM = 2440.0  # Mercury radius [km]
+else:
+    RM = 2080.0
+
 dx = 75.0            # grid spacing [km]
 trace_length = 15 * RM
 surface_tol = 75.0
@@ -33,7 +37,7 @@ surface_tol = 75.0
 n_lat = 75
 n_lon = n_lat*2
 max_steps = 100000
-h_step = 50.0
+h_step = 25.0
 
 # --------------------------
 # CREATE SURFACE SEEDS
@@ -233,3 +237,48 @@ if make_plots:
                 bbox_inches="tight")
     print("Saved:\t", os.path.join(output_ftpt, f"{case}_field_footprints_{step}.png"))
     plt.close()
+
+# --------------------------
+# CONNECTEDNESS + OCB METRICS
+# --------------------------
+seed_lon_spacing = 360.0 / n_lon
+bin_width = max(5.0, 2.5 * seed_lon_spacing)
+n_bins = int(360.0 / bin_width)
+
+lon_bins = np.linspace(-180, 180, n_bins)
+
+df_ocb = ocb_curve_df(df_planet, lon_bins)
+ocb_csv = os.path.join(output_folder, f"{case}_{step}_ocb_curve.csv")
+df_ocb.to_csv(ocb_csv, index=False)
+print("\nSaved OCB curve to:", ocb_csv)
+
+# --------------------------
+# Summarize OCB metrics
+# --------------------------
+df_ocb_summary = summarize_ocb(df_ocb, planet_radius_km=RM)
+
+# --------------------------
+# Compute connectedness index
+# --------------------------
+C_index = compute_connectedness_index(df_planet)
+
+# --------------------------
+# Combine into a single metrics DataFrame
+# --------------------------
+df_metrics = df_ocb_summary.copy()
+
+# Add metadata
+df_metrics.insert(0, "case", case)
+df_metrics.insert(1, "step", step)
+df_metrics.insert(2, "time_s", step * 0.002)
+
+# Add connectedness
+df_metrics["connectedness_index"] = C_index
+
+# --------------------------
+# Save full metrics CSV
+# --------------------------
+metrics_csv = os.path.join(output_folder, f"{case}_{step}_connectedness_metrics.csv")
+df_metrics.to_csv(metrics_csv, index=False)
+
+print("Saved connectedness metrics to:", metrics_csv)
