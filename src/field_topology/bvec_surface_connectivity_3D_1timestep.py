@@ -11,27 +11,28 @@ import matplotlib.lines as mlines
 from src.field_topology.topology_utils import *
 
 debug = False
-make_plots = False
+make_plots = True
 
 # --------------------------
 # SETTINGS
 # --------------------------
-case = "RPS"
-input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/05/out/"
+case = "CPS"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base_largerxdomain_smallergridsize/out/"
 ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000.nc")
 
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology_newRM/{case}_Base/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base_largerxdomain_smallergridsize/"
 os.makedirs(output_folder, exist_ok=True)
 
 # Planet parameters
 if case in ["RPN", "RPS"]:
     RM = 2440.0  # Mercury radius [km]
 else:
-    RM = 2080.0
+    # RM = 2080.0
+    RM = 2440.0
 
-dx = 75.0            # grid spacing [km]
+dx = 200.0            # grid spacing [km]
 trace_length = 15 * RM
-surface_tol = 75.0
+surface_tol = 200.0
 
 # Seed settings
 n_lat = 75
@@ -140,9 +141,9 @@ footprints_class = []
 lines_by_topo = {"closed": [], "open": []}
 
 for seed in seeds:
-    traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step, surface_tol=dx)
-    traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=-h_step, surface_tol=dx)
-    topo = classify(traj_fwd, traj_bwd, RM, exit_fwd_y, exit_bwd_y)
+    traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step)
+    traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=-h_step)
+    topo = classify(traj_fwd, traj_bwd, RM + dx, exit_fwd_y, exit_bwd_y)
     if topo not in ["TBD"]:
         lines_by_topo[topo].append(traj_fwd[:, [0, 2]])
         lines_by_topo[topo].append(traj_bwd[:, [0, 2]])
@@ -226,7 +227,7 @@ if make_plots:
     ax.set_yticks(lat_ticks_rad)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    ax.set_title(f"{case} Magnetic Footprints, t = {step * 0.002} s")
+    ax.set_title(f"{case} (Larger X Domain) Magnetic Footprints, t = {step * 0.002} s")
     ax.grid(True)
     ax.legend(loc='lower left')
 
