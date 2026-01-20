@@ -2,10 +2,10 @@ from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
 case = "CPN"
-sim_step = 115000
-filename = f'Amitis_{case}_Base_' + "%06d"%(sim_step)
+sim_step = 350000
+filename = f'Amitis_{case}_HNHV_' + "%06d"%(sim_step)
 compress = True
-obj_hdf  = amitis_hdf(f'/Volumes/data_backup/extreme_base/{case}_Base/05/out/',
+obj_hdf  = amitis_hdf(f'/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/10/out/',
                       filename + '.h5')
 
 debug = False

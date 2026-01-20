@@ -18,6 +18,7 @@ os.makedirs(output_folder, exist_ok=True)
 debug = False
 morph_map = False
 footprints = "add"  # valid arguments: 'compute', 'add', or None
+method = "_newRM"
 
 R_M = 2440.0        # Mercury radius [km]
 LAT_BINS = 180      # Surface latitude bins
@@ -127,7 +128,8 @@ for case in cases:
     cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
 
     if footprints is not None:
-        input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+        # input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+        input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology{method}/"
         if footprints == 'compute':
             # csv_file = os.path.join(input_folder2, f"{case}_last_10_footprints_median_class.csv")  # median CSV with footprints
             csv_file = os.path.join(input_folder2, f"{case}_115000_footprints_class.csv")  # single timestep CSV with footprints
@@ -196,7 +198,7 @@ for case in cases:
 # Save figure
 plt.tight_layout()
 if footprints is not None:
-    outfile_png = os.path.join(output_folder, "all_cases_surface_flux_OCB_115000.png")
+    outfile_png = os.path.join(output_folder, f"all_cases_surface_flux_OCB_115000{method}.png")
 else:
     outfile_png = os.path.join(output_folder, "all_cases_surface_flux_1150000.png")
 

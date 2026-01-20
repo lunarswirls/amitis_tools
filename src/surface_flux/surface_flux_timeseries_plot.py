@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 # -------------------------------
 # Configuration
 # -------------------------------
-case = "RPS"
+case = "CPN"
 
 # input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 # output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
-input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/High_HNHV/{case}_HNHV/object/"
+input_folder1 = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/plane_product/object/"
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/High_HNHV_surface_flux/timeseries_{case.lower()}"
 os.makedirs(output_folder, exist_ok=True)
 

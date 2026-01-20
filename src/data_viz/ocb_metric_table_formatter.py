@@ -4,12 +4,13 @@ import pandas as pd
 # --------------------------
 # SETTINGS
 # --------------------------
-cases = ["RPS", "RPN", "CPS", "CPN"]
+cases = ["RPN", "CPN", "RPS", "CPS"]
 step = 115000
+method = "_new2RM"
 output_folder = "/Users/danywaller/Projects/mercury/extreme/bfield_topology/"
-output_tex_nlat = os.path.join(output_folder, f"ocb_north_latitude_metrics_{step}.tex")
-output_tex_slat = os.path.join(output_folder, f"ocb_south_latitude_metrics_{step}.tex")
-output_tex_asym = os.path.join(output_folder, f"ocb_asymmetry_metrics_{step}.tex")
+output_tex_nlat = os.path.join(output_folder, f"ocb_north_latitude_metrics_{step}{method}.tex")
+output_tex_slat = os.path.join(output_folder, f"ocb_south_latitude_metrics_{step}{method}.tex")
+output_tex_asym = os.path.join(output_folder, f"ocb_asymmetry_metrics_{step}{method}.tex")
 
 # --------------------------
 # METRICS
@@ -22,7 +23,7 @@ south_latitude_metrics = [
 ]
 
 asymmetry_metrics = [
-    "polar_cap_area_asymmetry", "mean_lat_asymmetry", "connectedness_index"
+    "connectedness_index", "ocb_north_eccentricity", "ocb_south_eccentricity", "polar_cap_area_asymmetry", "mean_lat_asymmetry"
 ]
 
 metric_names = {
@@ -34,9 +35,9 @@ metric_names = {
     "ocb_south_min_lat": "South min $\\phi$ [deg]",
     "ocb_south_max_lat": "South max $\\phi$ [deg]",
     "ocb_south_std_lat": "South $\\sigma_\\phi$ [deg]",
-    "ocb_north_eccentricity": "North Eccentricity",
+    "ocb_north_eccentricity": "$e_{north}$",
     "ocb_north_polar_cap_area_km2": "North Polar Cap Area [km$^2$]",
-    "ocb_south_eccentricity": "South Eccentricity",
+    "ocb_south_eccentricity": "$e_{south}$",
     "ocb_south_polar_cap_area_km2": "South Polar Cap Area [km$^2$]",
     "polar_cap_area_asymmetry": "MCAA",
     "mean_lat_asymmetry": "MLA",
@@ -49,7 +50,8 @@ metric_names = {
 rows = []
 
 for case in cases:
-    input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+    # input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+    input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology{method}/"
     csv_file = os.path.join(input_folder, f"{case}_{step}_connectedness_metrics.csv")
     if not os.path.exists(csv_file):
         print(f"Warning: CSV not found for {case}: {csv_file}")
@@ -107,12 +109,12 @@ with open(output_tex_slat, "w") as f:
 print(f"Saved LaTeX latitude table to {output_tex_slat}")
 
 # --------------------------
-# TABLE 2: ECCENTRICITY & ASYMMETRY
+# TABLE 2: CONNECTIVITY & ASYMMETRY
 # --------------------------
 df_asym = df_all[["Case"] + [metric_names[m] for m in asymmetry_metrics]]
 latex_table_asym = df_asym.to_latex(
     index=False,
-    caption="Eccentricity, Polar Cap Area Asymmetry, and Mean Latitude Asymmetry",
+    caption="Connectivity (C), Magnetosphere Cusp Area Asymmetry (MCAA), and Mean Latitude Asymmetry (MLA)",
     label="tab:ocb_asymmetry",
     escape=False
 )

@@ -70,42 +70,126 @@ def cartesian_to_latlon(r):
 @njit
 def rk45_step(f, r, h, Vx, Vy, Vz, x_grid, y_grid, z_grid):
     """
+    Perform a single Runge-Kutta-Fehlberg (RK4(5)) integration step.
 
+    Parameters
+    ----------
+    f : callable
+        Function that evaluates the vector field at a given position.
+    r : ndarray (3,)
+        Current position vector.
+    h : float
+        Integration step size.
+    Vx, Vy, Vz : ndarray
+        Components of the vector field defined on a grid.
+    x_grid, y_grid, z_grid : ndarray
+        Coordinate grids corresponding to the vector field.
+
+    Returns
+    -------
+    r_next : ndarray (3,)
+        Updated position after one RK45 step.
     """
+
+    # First slope (Euler step)
     k1 = f(r, Vx, Vy, Vz, x_grid, y_grid, z_grid)
-    k2 = f(r + h*k1*0.25, Vx, Vy, Vz, x_grid, y_grid, z_grid)
-    k3 = f(r + h*(3*k1+9*k2)/32, Vx, Vy, Vz, x_grid, y_grid, z_grid)
-    k4 = f(r + h*(1932*k1 - 7200*k2 + 7296*k3)/2197, Vx, Vy, Vz, x_grid, y_grid, z_grid)
-    k5 = f(r + h*(439*k1/216 - 8*k2 + 3680*k3/513 - 845*k4/4104), Vx, Vy, Vz, x_grid, y_grid, z_grid)
-    k6 = f(r + h*(-8*k1/27 + 2*k2 - 3544*k3/2565 + 1859*k4/4104 - 11*k5/40), Vx, Vy, Vz, x_grid, y_grid, z_grid)
-    r_next = r + h*(16*k1/135 + 6656*k3/12825 + 28561*k4/56430 - 9*k5/50 + 2*k6/55)
+
+    # Second slope, evaluated at r + h/4 * k1
+    k2 = f(r + h * k1 * 0.25, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+    # Third slope, weighted combination of k1 and k2
+    k3 = f(r + h * (3 * k1 + 9 * k2) / 32, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+    # Fourth slope, higher-order correction using k1, k2, and k3
+    k4 = f(r + h * (1932 * k1 - 7200 * k2 + 7296 * k3) / 2197, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+    # Fifth slope, incorporating additional higher-order terms
+    k5 = f(r + h * (439 * k1 / 216 - 8 * k2 + 3680 * k3 / 513 - 845 * k4 / 4104), Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+    # Sixth slope, final intermediate evaluation for the 5th-order estimate
+    k6 = f(r + h * (-8 * k1 / 27 + 2 * k2 - 3544 * k3 / 2565 + 1859 * k4 / 4104 - 11 * k5 / 40), Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+    # Compute the next position using the 5th-order RK solution
+    r_next = r + h * (16 * k1 / 135 + 6656 * k3 / 12825 + 28561 * k4 / 56430 - 9 * k5 / 50 + 2 * k6 / 55)
+
     return r_next
+
 
 @njit
 def trace_field_line_rk(seed, Vx, Vy, Vz, x_grid, y_grid, z_grid, RM, max_steps=5000, h=50.0, surface_tol=-1.0):
     """
-    Trace vector field line using Runge-Kutta 4-5 method
+    Trace a vector field line using a Runge-Kutta 4–5 integration scheme.
 
+    Parameters
+    ----------
+    seed : array-like (3,)
+        Starting position of the field line.
+    Vx, Vy, Vz : ndarray
+        Vector field components defined on a 3D grid.
+    x_grid, y_grid, z_grid : ndarray
+        Coordinate grids corresponding to the vector field.
+    RM : float
+        Reference radius (e.g., planetary radius) for surface termination.
+    max_steps : int, optional
+        Maximum number of integration steps.
+    h : float, optional
+        Step size for the RK45 integrator.
+    surface_tol : float, optional
+        Tolerance added to RM to define the surface termination condition.
+
+    Returns
+    -------
+    traj : ndarray
+        Array of traced positions along the field line.
+    exit_y_boundary : bool
+        True if the trajectory exits through the y-boundary.
     """
+
+    # Preallocate array to store the trajectory
     traj = np.empty((max_steps, 3), dtype=np.float64)
+
+    # Initialize the first point with the seed location
     traj[0] = seed
     r = seed.copy()
+
+    # Flag indicating whether the field line exits via the y-boundary
     exit_y_boundary = False
+
+    # Main integration loop
     for i in range(1, max_steps):
+
+        # Evaluate the vector field at the current position
         V = get_V(r, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+        # Stop integration if the vector field vanishes
         if np.all(V == 0.0):
             return traj[:i], exit_y_boundary
-        r_next = rk45_step(get_V, r, h, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+        # Advance one step using the RK45 integrator
+        r_next = rk45_step(get_V, r, h,
+                           Vx, Vy, Vz,
+                           x_grid, y_grid, z_grid)
+
+        # Store the new position and update the current location
         traj[i] = r_next
         r = r_next
+
+        # Terminate if the trajectory reaches the surface (within tolerance)
         if np.linalg.norm(r) <= RM + surface_tol:
-            return traj[:i+1], exit_y_boundary
-        if (r[0]<x_grid[0] or r[0]>x_grid[-1] or
-            r[2]<z_grid[0] or r[2]>z_grid[-1]):
-            return traj[:i+1], exit_y_boundary
-        if r[1]<y_grid[0] or r[1]>y_grid[-1]:
+            return traj[:i + 1], exit_y_boundary
+
+        # Terminate if the trajectory exits the x or z grid boundaries
+        if (r[0] < x_grid[0] or r[0] > x_grid[-1] or
+            r[2] < z_grid[0] or r[2] > z_grid[-1]):
+            return traj[:i + 1], exit_y_boundary
+
+        # Terminate if the trajectory exits the y grid boundaries
+        # and mark that the y-boundary was crossed
+        if r[1] < y_grid[0] or r[1] > y_grid[-1]:
             exit_y_boundary = True
-            return traj[:i+1], exit_y_boundary
+            return traj[:i + 1], exit_y_boundary
+
+    # Return the full trajectory if max_steps is reached
     return traj, exit_y_boundary
 
 @njit
@@ -366,8 +450,15 @@ def summarize_ocb(df_ocb, planet_radius_km=2440.0):
         lat_std = np.nanstd(lat)
 
         # Eccentricity: elongation proxy (0 → circular)
-        denom = abs(lat_max) + abs(lat_min)
-        eccentricity = (abs(lat_max) - abs(lat_min)) / denom if denom != 0 else np.nan
+        lat_abs = np.abs(lat)
+        lat_poleward = np.nanmax(lat_abs)
+        lat_equatorward = np.nanmin(lat_abs)
+
+        denom = lat_poleward+lat_equatorward
+        eccentricity = (
+            (lat_poleward-lat_equatorward) / denom
+            if denom != 0 else np.nan
+        )
 
         # --------------------------
         # Longitude statistics (circular)

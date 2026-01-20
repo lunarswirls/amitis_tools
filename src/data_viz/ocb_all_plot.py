@@ -11,7 +11,7 @@ from matplotlib.lines import Line2D
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/"
 os.makedirs(output_folder, exist_ok=True)
 step = 115000
-
+method = "_newRM"
 R_M = 2440.0        # Mercury radius [km]
 
 # Load equirectangular Mercury surface image
@@ -31,7 +31,7 @@ lat = np.linspace(-np.pi/2, np.pi/2, ny)   # -90° to 90° in radians
 lon_grid, lat_grid = np.meshgrid(lon, lat)
 
 # Prepare figure
-fig, ax = plt.subplots(1, 1, figsize=(12, 8), subplot_kw={"projection": "hammer"})
+fig, ax = plt.subplots(1, 1, figsize=(10, 8), subplot_kw={"projection": "hammer"})
 
 # Plot image using pcolormesh
 # flip image vertically so latitude aligns
@@ -44,7 +44,8 @@ cases = ["RPS", "CPS", "RPN", "CPN"]
 case_linestyles = {"RPS": "--", "CPS": ":", "RPN": "-", "CPN": "-."}
 
 for case in cases:
-    input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+    # input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+    input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology{method}/"
     csv_file = os.path.join(input_folder, f"{case}_115000_ocb_curve.csv")  # single timestep CSV with OCB curve
     if os.path.exists(csv_file):
         df_footprints = pd.read_csv(csv_file)
@@ -67,7 +68,7 @@ for case in cases:
     # Plot
     ls = case_linestyles[case]
 
-    ax.plot(lon_n_rad, lat_n_rad, color="limegreen", lw=2, ls=ls)
+    ax.plot(lon_n_rad, lat_n_rad, color="lime", lw=2, ls=ls)
     ax.plot(lon_s_rad, lat_s_rad, color="cyan", lw=2, ls=ls)
 
 # Longitude ticks (-170 to 170 every n °)
@@ -91,14 +92,15 @@ legend_lines = [Line2D([0], [0], color="black", lw=2, ls=ls, label=case)
                 for case, ls in case_linestyles.items()]
 
 # Add the legend to the plot
-ax.legend(handles=legend_lines, title="Case", loc="lower right", framealpha=0.9, ncol=2)
-ax.grid(True, alpha=0.3, color="grey")
+ax.legend(handles=legend_lines, title="Case", loc="lower right", bbox_to_anchor=(1.05, -0.05), framealpha=0.9, ncol=2)
+ax.grid(True, alpha=0.6, color="black")
 
-ax.set_title("Mercury OCB for all simulation cases")
+ax.set_title(f"Mercury OCB ({method.replace("_","")})")
 
 # Save figure
 plt.tight_layout()
-outfile_png = os.path.join(output_folder, "all_cases_OCB_comparison_115000.png")
+# outfile_png = os.path.join(output_folder, "all_cases_OCB_comparison_115000.png")
+outfile_png = os.path.join(output_folder, f"all_cases_OCB_comparison_115000{method}.png")
 
 plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
 print("Saved figure:", outfile_png)
