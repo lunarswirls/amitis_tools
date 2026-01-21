@@ -7,7 +7,7 @@ import pandas as pd
 cases = ["RPN", "CPN", "RPS", "CPS"]
 step = 115000
 method = "_new2RM"
-output_folder = "/Users/danywaller/Projects/mercury/extreme/bfield_topology/"
+output_folder = "/Users/danywaller/Projects/mercury/extreme/bfield_topology/CPS_Base_largerxdomain_smallergridsize/"
 output_tex_nlat = os.path.join(output_folder, f"ocb_north_latitude_metrics_{step}{method}.tex")
 output_tex_slat = os.path.join(output_folder, f"ocb_south_latitude_metrics_{step}{method}.tex")
 output_tex_asym = os.path.join(output_folder, f"ocb_asymmetry_metrics_{step}{method}.tex")
@@ -51,7 +51,8 @@ rows = []
 
 for case in cases:
     # input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
-    input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology{method}/"
+    # input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology{method}/"
+    input_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/CPS_Base_largerxdomain_smallergridsize/"
     csv_file = os.path.join(input_folder, f"{case}_{step}_connectedness_metrics.csv")
     if not os.path.exists(csv_file):
         print(f"Warning: CSV not found for {case}: {csv_file}")

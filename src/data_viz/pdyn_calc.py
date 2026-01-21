@@ -6,25 +6,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-case = "CPN"
+# base cases: CPN_Base RPN_Base CPS_Base RPS_Base
+# HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
+case = "CPN_Base"
+
+viz_slice = 'xz'
 
 # SETTINGS
-input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/fig_yz/"
-out_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/slice_pdyn_yz/"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}/fig_{viz_slice}/"
+out_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}/slice_pdyn_{viz_slice}/"
 os.makedirs(out_folder, exist_ok=True)
 
 # proton mass (kg)
 M_P = 1.6726e-27
 
-# take the last approx. 10 seconds
-sim_steps = list(range(95000, 115000 + 1, 1000))
+# first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
+if "Base" in case:
+    # take last 10-ish seconds
+    sim_steps = range(98000, 115000 + 1, 1000)
+elif "HNHV" in case:
+    sim_steps = range(115000, 350000 + 1, 1000)
 
 for sim_step in sim_steps:
-    filename = 'Base_' + "%06d" % sim_step
+    filetime = "%06d" % sim_step
 
-    f = input_folder + f"Amitis_{case}_" + filename + "_yz_comp.nc"
+    f = input_folder + f"Amitis_{case}_{str(filetime)}_{viz_slice}_comp.nc"
 
-    print(f"Processing Amitis_{case}_{str(filename)}_yz_comp.nc ...")
+    print(f"Processing Amitis_{case}_{str(filetime)}_{viz_slice}_comp.nc ...")
 
     ds = xr.open_dataset(f)
 
@@ -63,7 +71,7 @@ for sim_step in sim_steps:
     den04 = ds["den04"].sel(Nx=0, method="nearest").squeeze()
 
     # sum all densities to get total density
-    den_tot = (den01 + den02 + den03 + den04)  * 1e6     # cm^-3 -> m^-3
+    den_tot = (den01 + den02 + den03 + den04) * 1e6     # cm^-3 -> m^-3
 
     # dynamic pressure (Pa)
     P_pa = den_tot * M_P * v_mag ** 2

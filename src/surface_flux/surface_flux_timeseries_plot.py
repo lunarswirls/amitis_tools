@@ -11,12 +11,19 @@ import matplotlib.pyplot as plt
 # -------------------------------
 # Configuration
 # -------------------------------
-case = "CPN"
+# base cases: CPN_Base RPN_Base CPS_Base RPS_Base
+# HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
+case = "CPN_Base"
+
+if "Base" in case:
+    input_folder1 = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
+elif "HNHV" in case:
+    input_folder1 = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
 
 # input_folder1 = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/object/"
 # output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
-input_folder1 = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/plane_product/object/"
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/High_HNHV_surface_flux/timeseries_{case.lower()}"
+
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
 os.makedirs(output_folder, exist_ok=True)
 
 R_M = 2440.0        # Mercury radius [km]
@@ -31,7 +38,7 @@ ds0 = xr.open_dataset(
     # os.path.join(input_folder1, f"Amitis_{case}_Base_000000_xz_comp.nc")
     # Amitis_{case}_Base_000000_xz_comp.nc
 
-    os.path.join(input_folder1, f"Amitis_{case}_HNHV_115000_xz_comp.nc")
+    os.path.join(input_folder1, f"Amitis_{case}_115000_xz_comp.nc")
 )
 
 x = ds0["Nx"].values  # [units: km]
@@ -40,14 +47,16 @@ z = ds0["Nz"].values  # [units: km]
 
 ds0.close()
 
-# take last 10-ish seconds
-# sim_steps = range(98000, 115000 + 1, 1000)
-sim_steps = range(115000, 350000 + 1, 1000)
+if "Base" in case:
+    # take last 10-ish seconds
+    sim_steps = range(98000, 115000 + 1, 1000)
+elif "HNHV" in case:
+    sim_steps = range(115000, 350000 + 1, 1000)
 
 t_index = 0
 
 for step in sim_steps:
-    nc_file = os.path.join(input_folder1, f"Amitis_{case}_HNHV_{step:06d}_xz_comp.nc")
+    nc_file = os.path.join(input_folder1, f"Amitis_{case}_{step:06d}_xz_comp.nc")
     ds = xr.open_dataset(nc_file)
 
     flux, vr = compute_radial_flux(ds, x, y, z)
@@ -170,7 +179,7 @@ for step in sim_steps:
     ax.set_title(f"{case} Surface Flux, t = {step * 0.002} seconds")
 
     # --- Save ---
-    outfile_png = os.path.join(output_folder, f"{case}_HNHV_surface_flux_{step}.png")
+    outfile_png = os.path.join(output_folder, f"{case}_surface_flux_{step}.png")
     plt.tight_layout()
     plt.savefig(outfile_png, dpi=150, bbox_inches="tight")
     print("Saved:\t", outfile_png)

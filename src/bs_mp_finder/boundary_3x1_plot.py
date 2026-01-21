@@ -6,19 +6,33 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 
-# ----------------------------
-# SETTINGS
-# ----------------------------
-debug = False
+# -------------------------------
+# Configuration
+# -------------------------------
+# Plot background selection
+plot_id = "Pmag"   # options: "Bmag", "Jmag", "Pmag", "Bz"
 
-base = "RPS"
+# base cases: CPN_Base RPN_Base CPS_Base RPS_Base
+# HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
+case = "CPN_Base"
+
+if "Base" in case:
+    input_folder1 = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
+elif "HNHV" in case:
+    input_folder1 = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
+
+debug = False
 
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 n_slices = len(use_slices)       # number of requested slices
 slice_tag = "_".join(use_slices)
 
-# Plot background selection
-plot_id = "Pmag"   # options: "Bmag", "Jmag", "Pmag", "Bz"
+base_dir = f"/Users/danywaller/Projects/mercury/extreme_base/{case}/"
+out_folder = os.path.join(base_dir, "slice_bowshock/")
+os.makedirs(out_folder, exist_ok=True)
+
+out_folder_ts = os.path.join(out_folder, f"timeseries_{slice_tag}/")
+os.makedirs(out_folder_ts, exist_ok=True)
 
 PLOT_BG = {
     "Bmag": {
@@ -60,20 +74,11 @@ PLOT_BG = {
 }
 
 # first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
-if 0:
-    if base == "RPS" or base == "CPS":
-        sim_steps = range(27000, 115000 + 1, 1000)
-    else:
-        sim_steps = range(98000, 115000 + 1, 1000)
-
-sim_steps = range(98000, 115000 + 1, 1000)
-
-base_dir = f"/Users/danywaller/Projects/mercury/extreme_base/{base}_Base/"
-out_folder = os.path.join(base_dir, "slice_bowshock/")
-os.makedirs(out_folder, exist_ok=True)
-
-out_folder_ts = os.path.join(out_folder, f"timeseries_{slice_tag}/")
-os.makedirs(out_folder_ts, exist_ok=True)
+if "Base" in case:
+    # take last 10-ish seconds
+    sim_steps = range(98000, 115000 + 1, 1000)
+elif "HNHV" in case:
+    sim_steps = range(115000, 350000 + 1, 1000)
 
 RM_M = 2440.0e3  # units: m
 
@@ -427,14 +432,14 @@ acc = {
 # LOOP: per-timestep plotting + accumulation
 # ----------------------------
 for sim_step in sim_steps:
-    filename = "Base_" + f"{sim_step:06d}"
+    filetime = f"{sim_step:06d}"
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), constrained_layout=True)
     last_im = None
 
     for ax, use_slice in zip(axes, use_slices):
         input_folder = os.path.join(base_dir, f"fig_{use_slice}")
-        f = os.path.join(input_folder, f"Amitis_{base}_{filename}_{use_slice}_comp.nc")
+        f = os.path.join(input_folder, f"Amitis_{case}_{filetime}_{use_slice}_comp.nc")
 
         if not os.path.exists(f):
             ax.axis("off")
@@ -473,9 +478,9 @@ for sim_step in sim_steps:
         cbar.set_label(rf"${cfg['label']}$")
 
     tsec = sim_step * 0.002
-    fig.suptitle(f"{base} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) position at t = {tsec:.3f} s", fontsize=18, y=0.99)
+    fig.suptitle(f"{case} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) position at t = {tsec:.3f} s", fontsize=18, y=0.99)
 
-    outpath = os.path.join(out_folder_ts, f"{base}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
+    outpath = os.path.join(out_folder_ts, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
     fig.savefig(outpath, dpi=300)
     plt.close(fig)
 
@@ -539,9 +544,9 @@ if last_im is not None:
     cbar = fig.colorbar(last_im, ax=axes, location="right", shrink=0.9)
     cbar.set_label(rf"$\mathrm{{Median}}\ {cfg['label']}$")
 
-fig.suptitle(f"{base} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=18, y=0.99)
+fig.suptitle(f"{case} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=18, y=0.99)
 
-median_path = os.path.join(out_folder, f"{base}_{plot_id.lower()}_boundaries_{slice_tag}_median.png")
+median_path = os.path.join(out_folder, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median.png")
 fig.savefig(median_path, dpi=300)
 plt.close(fig)
 
