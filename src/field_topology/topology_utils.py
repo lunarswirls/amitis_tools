@@ -197,15 +197,16 @@ def classify(traj_fwd, traj_bwd, RM, exit_fwd_y=False, exit_bwd_y=False):
     """
     Classify a trajectory based on termination point of line and return a classification label
 
-    If line hits domain boundary, labeled 'unknown'
+    If surface-originating line hits y-axis domain boundary, labeled 'unknown'
     If line originated from and returns to planet surface, labeled 'closed'
     If line originated from but does not return to planet surface, labeled 'open'
+    If line does not originate from planet surface, labeled 'solar_wind'
     """
     # check if last point in trajectory is equal to or less than Mercury radius
     hit_fwd = np.linalg.norm(traj_fwd[-1]) <= RM
     hit_bwd = np.linalg.norm(traj_bwd[-1]) <= RM
-    if exit_fwd_y or exit_bwd_y:
-        # line ran into domain boundary - terminate as unknown
+    if (exit_fwd_y or exit_bwd_y) and (hit_fwd or hit_bwd):
+        # surface-originating line ran into y-axis domain boundary - terminate as unknown
         return "TBD"
     if hit_fwd and hit_bwd:
         # line originated from and returned to planet surface - closed
@@ -214,7 +215,8 @@ def classify(traj_fwd, traj_bwd, RM, exit_fwd_y=False, exit_bwd_y=False):
         # line connected to planet surface at only ONE end - open
         return "open"
     else:
-        return "TBD"
+        # line does not connect to planet surface at all - solar wind
+        return "solar_wind"
 
 
 def compute_open_fraction(df, lon0, dlon=5.0, lat_bins=np.linspace(0, 90, 91), hemisphere="north"):

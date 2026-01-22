@@ -13,24 +13,24 @@ from src.field_topology.topology_utils import *
 # ======================
 # USER PARAMETERS
 # ======================
-case = "CPS"
+case = "CPN_Base"
 
-input_folder = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xz/"
-ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000_xz_comp.nc")
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/all_xz/"
+ncfile = os.path.join(input_folder, f"Amitis_{case}_115000_xz_comp.nc")
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}/"
 os.makedirs(output_folder, exist_ok=True)
 
 plot_lines = True  # True to plot field lines
 RM = 2440.0  # Mercury radius [km]
 dx = 75.0  # grid spacing
-trace_length = 8 * RM
+trace_length = 20 * RM
 surface_tol = dx
 
 # seed resolution
 n_lat = 60
 n_lon = 120
 
-max_steps = 5000  # max RK steps
+max_steps = 100000  # max RK steps
 h_step = 50.0  # integration step size [km]
 
 start = datetime.now()
@@ -54,26 +54,43 @@ ymin, ymax = y.min(), y.max()
 zmin, zmax = z.min(), z.max()
 
 # ======================
-# CREATE SEED POINTS ON SURFACE
+# CREATE 2D SEEDS IN X–Z PLANE
 # ======================
-lats_surface = np.linspace(-90, 90, n_lat)
-lons_surface = np.linspace(-180, 180, n_lon)
+y0 = 0.0  # X–Z plane
 
 seeds = []
-for lat in lats_surface:
-    for lon in lons_surface:
-        phi = np.radians(lat)
-        theta = np.radians(lon)
-        x_s = RM * np.cos(phi) * np.cos(theta)
-        y_s = RM * np.cos(phi) * np.sin(theta)
-        z_s = RM * np.sin(phi)
-        seeds.append(np.array([x_s, y_s, z_s]))
+
+# ---- 1. Planet surface seeds (circle in X–Z plane) ----
+n_surface = 360
+theta = np.linspace(0, 2 * np.pi, n_surface, endpoint=False)
+
+for t in theta:
+    x_s = RM * np.cos(t)
+    z_s = RM * np.sin(t)
+    seeds.append([x_s, y0, z_s])
+
+# ---- 2. Domain border seeds ----
+n_border = 200
+
+# Left / Right boundaries
+z_vals = np.linspace(zmin, zmax, n_border)
+for z_s in z_vals:
+    seeds.append([xmin, y0, z_s])
+    seeds.append([xmax, y0, z_s])
+
+# Top / Bottom boundaries
+x_vals = np.linspace(xmin, xmax, n_border)
+for x_s in x_vals:
+    seeds.append([x_s, y0, zmin])
+    seeds.append([x_s, y0, zmax])
+
 seeds = np.array(seeds)
+print(f"Total seeds: {len(seeds)}")
 
 # Compute footprints
 footprints = []
 footprints_class = []
-lines_by_topo = {"closed": [], "open": []}
+lines_by_topo = {"closed": [], "open": [], "solar_wind": []}
 
 for seed in seeds:
     traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step)
@@ -96,7 +113,7 @@ df_planet = pd.DataFrame({
     "classification": footprints_class
 })
 
-csv_file = os.path.join(output_folder, f"Amitis_{case}_Base_115000_xz_comp_footprints.csv")
+csv_file = os.path.join(output_folder, f"Amitis_{case}_115000_xz_comp_footprints.csv")
 df_planet.to_csv(csv_file, index=False)
 print(f"Saved {len(df_planet)} footprints to {csv_file}")
 
@@ -124,31 +141,16 @@ if plot_lines:
     ax.set_xlabel("X [km]")
     ax.set_ylabel("Z [km]")
     ax.set_aspect("equal")
-    ax.set_title("Mercury Magnetic Field-Line Topology (X-Z Plane)")
-    ax.set_xlim(-5 * RM, 5 * RM)
-    ax.set_ylim(-5 * RM, 5 * RM)
+    ax.set_title(f"{case.replace("_", " ")} Magnetic Field-Line Topology (X-Z Plane)")
+    ax.set_xlim(-6 * RM, 4.5 * RM)
+    ax.set_ylim(-4.5 * RM, 4.5 * RM)
     plt.tight_layout()
-    plt.show()
-
-# ======================
-# PLOT FOOTPRINTS
-# ======================
-fig, ax = plt.subplots(figsize=(9, 4))
-for topo, color in [("closed", "blue"), ("open", "red")]:
-    subset = df_planet[df_planet['classification'] == topo]
-    if subset.empty: continue
-    ax.scatter(subset['longitude_deg'], subset['latitude_deg'], s=10, color=color, label=topo, alpha=0.7)
-
-ax.set_xlim(-180, 180)
-ax.set_ylim(-90, 90)
-ax.set_xlabel("Longitude [deg]")
-ax.set_ylabel("Latitude [deg]")
-ax.set_title("Mercury Magnetic Footprints")
-ax.grid(True)
-ax.legend()
-plt.tight_layout()
-plt.show()
-
+    output_topo = os.path.join(output_folder, "2D_topology/")
+    os.makedirs(output_topo, exist_ok=True)
+    plt.savefig(os.path.join(output_topo, f"{case}_bfield_topology_{step}.png"), dpi=150,
+                bbox_inches="tight")
+    print("Saved:\t", os.path.join(output_topo, f"{case}_bfield_topology_{step}.png"))
+    plt.close()
 
 # ======================
 # LATITUDE STATISTICS

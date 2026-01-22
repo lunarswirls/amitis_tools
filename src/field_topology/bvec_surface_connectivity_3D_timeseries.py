@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -10,30 +11,33 @@ from matplotlib.collections import LineCollection
 import matplotlib.lines as mlines
 
 debug = False
+make_line_plots = False
 
 # SETTINGS
-case = "RPS"
-input_folder_xy = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xy/"
-input_folder_xz = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_xz/"
-input_folder_yz = f"/Volumes/data_backup/extreme_base/{case}_Base/plane_product/all_yz/"
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+case = "CPN_Base"
+input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}/"
 os.makedirs(output_folder, exist_ok=True)
 
 # Planet parameters
-RM = 2440.0          # Mercury radius [km]
+if case in ["RPN_Base", "RPS_Base"]:
+    RM = 2440.0  # Mercury radius [km]
+else:
+    # RM = 2080.0
+    RM = 2440.0
 dx = 75.0            # grid spacing [km]
 trace_length = 50 * RM
 surface_tol = dx
 
 # Seed settings
-n_lat = 60
-n_lon = 120
-max_steps = 1000
+n_lat = 75
+n_lon = n_lat*2
+max_steps = 10000
 h_step = 50.0
 
 # Files
-N_files = 10
-all_files = sorted([f for f in os.listdir(input_folder_xz) if f.endswith("_xz_comp.nc")])
+N_files = 18
+all_files = sorted([f for f in os.listdir(input_folder) if f.endswith("_xz_comp.nc")])
 last_files = all_files[-N_files:]
 print(f"Processing last {len(last_files)} files: {last_files}")
 
@@ -51,94 +55,104 @@ for lat in lats_surface:
         seeds.append(np.array([x_s, y_s, z_s]))
 seeds = np.array(seeds)
 
-# FUNCTION TO MERGE PLANES FOR ONE FILE
-def load_merged_field(file_basename):
+
+def load_full_domain(ncfile, xlim=[None, None], ylim=[None, None], zlim=[None, None]):
     """
-    Load XY, XZ, YZ planes and merge to cover maximum extent.
+    Load full 3D magnetic field from a single NetCDF file.
+
+    Can optionally be cropped by xlim, ylim, zlim, defaults are [None, None]
+
+    Returns:
+        x, y, z : 1D coordinate arrays
+        Bx, By, Bz : 3D arrays with shape (Nz, Ny, Nx)
     """
-    file_xy = os.path.join(input_folder_xy, file_basename.replace("_xz", "_xy").replace("_yz","_xy"))
-    file_xz = os.path.join(input_folder_xz, file_basename)
-    file_yz = os.path.join(input_folder_yz, file_basename.replace("_xz", "_yz"))
+    xmin, xmax = xlim
+    ymin, ymax = ylim
+    zmin, zmax = zlim
 
-    ds_xy = xr.open_dataset(file_xy)
-    ds_xz = xr.open_dataset(file_xz)
-    ds_yz = xr.open_dataset(file_yz)
+    ds = xr.open_dataset(ncfile)
 
-    # Merge coordinates
-    x_grid = np.unique(np.concatenate([ds_xy["Nx"].values, ds_xz["Nx"].values, ds_yz["Nx"].values]))
-    y_grid = np.unique(np.concatenate([ds_xy["Ny"].values, ds_xz["Ny"].values, ds_yz["Ny"].values]))
-    z_grid = np.unique(np.concatenate([ds_xy["Nz"].values, ds_xz["Nz"].values, ds_yz["Nz"].values]))
+    ds = ds.assign_coords(Nx=ds["Nx"].astype(float), Nz=ds["Nz"].astype(float))
 
-    Bx_full = np.zeros((len(x_grid), len(y_grid), len(z_grid)))
-    By_full = np.zeros_like(Bx_full)
-    Bz_full = np.zeros_like(Bx_full)
+    x = ds["Nx"].values
+    y = ds["Ny"].values
+    z = ds["Nz"].values
 
-    def insert_plane(ds):
-        # Load original arrays
-        Bx_orig = ds["Bx_tot"].isel(time=0).values
-        By_orig = ds["By_tot"].isel(time=0).values
-        Bz_orig = ds["Bz_tot"].isel(time=0).values
+    t = ds["time"].values
 
-        if debug:
-            # Print shapes before transpose
-            print("Before transpose:")
-            for var in ["Bx_tot", "By_tot", "Bz_tot"]:
-                print(f"{var}: dims={ds[var].dims}, shape={ds[var].shape}")
+    if len(t) > 1:
+        print("You have more than one time value in a single file wtf")
 
-        #  Transpose: Nz, Ny, Nx --> Nx, Ny, Nz
-        Bx_plane = np.transpose(Bx_orig, (2, 1, 0))
-        By_plane = np.transpose(By_orig, (2, 1, 0))
-        Bz_plane = np.transpose(Bz_orig, (2, 1, 0))
+    if debug:
+        print(min(x), max(x))
+        print(min(y), max(y))
+        print(min(z), max(z))
 
-        if debug:
-            # Print shapes after transpose
-            print("\nAfter transpose:")
-            print("Bx_plane shape:", Bx_plane.shape)
-            print("By_plane shape:", By_plane.shape)
-            print("Bz_plane shape:", Bz_plane.shape)
-            print("\n")
+    # Extract fields (drop time dimension)
+    Bx = ds["Bx_tot"].isel(time=0).values
+    By = ds["By_tot"].isel(time=0).values
+    Bz = ds["Bz_tot"].isel(time=0).values
 
-        xi = np.searchsorted(x_grid, ds["Nx"].values)
-        yi = np.searchsorted(y_grid, ds["Ny"].values)
-        zi = np.searchsorted(z_grid, ds["Nz"].values)
-        Bx_full[xi[0]:xi[0]+Bx_plane.shape[0],
-                yi[0]:yi[0]+Bx_plane.shape[1],
-                zi[0]:zi[0]+Bx_plane.shape[2]] = Bx_plane
-        By_full[xi[0]:xi[0]+By_plane.shape[0],
-                yi[0]:yi[0]+By_plane.shape[1],
-                zi[0]:zi[0]+By_plane.shape[2]] = By_plane
-        Bz_full[xi[0]:xi[0]+Bz_plane.shape[0],
-                yi[0]:yi[0]+Bz_plane.shape[1],
-                zi[0]:zi[0]+Bz_plane.shape[2]] = Bz_plane
+    if debug:
+        # Print shapes before transpose
+        print("Before transpose:")
+        for var in ["Bx", "By", "Bz"]:
+            print(f"{var}: dims={ds[var].dims}, shape={ds[var].shape}")
 
-    insert_plane(ds_xy)
-    insert_plane(ds_xz)
-    insert_plane(ds_yz)
+    #  Transpose: Nz, Ny, Nx --> Nx, Ny, Nz
+    Bx_plane = np.transpose(Bx, (2, 1, 0))
+    By_plane = np.transpose(By, (2, 1, 0))
+    Bz_plane = np.transpose(Bz, (2, 1, 0))
 
-    ds_xy.close()
-    ds_xz.close()
-    ds_yz.close()
-    return x_grid, y_grid, z_grid, Bx_full, By_full, Bz_full
+    if debug:
+        # Print shapes after transpose
+        print("\nAfter transpose:")
+        print("Bx shape:", Bx_plane.shape)
+        print("By shape:", By_plane.shape)
+        print("Bz shape:", Bz_plane.shape)
+        print("\n")
+
+    nx_mask = (x >= xmin if xmin is not None else x >= min(x)) & (x <= xmax if xmax is not None else x <= max(x))
+    ny_mask = (y >= ymin if ymin is not None else y >= min(y)) & (y <= ymax if ymax is not None else y <= max(y))
+    nz_mask = (z >= zmin if zmin is not None else z >= min(z)) & (z <= zmax if zmax is not None else z <= max(z))
+
+    plot_x = x[nx_mask]
+    plot_y = y[ny_mask]
+    plot_z = z[nz_mask]
+
+    Bx_masked = Bx_plane[nx_mask, :, :][:, ny_mask, :][:, :, nz_mask]
+    By_masked = By_plane[nx_mask, :, :][:, ny_mask, :][:, :, nz_mask]
+    Bz_masked = Bz_plane[nx_mask, :, :][:, ny_mask, :][:, :, nz_mask]
+
+    ds.close()
+    return plot_x, plot_y, plot_z, Bx_masked, By_masked, Bz_masked
 
 # LOOP OVER FILES
 all_footprints = []
 
 for ncfile in last_files:
     print(f"Processing {ncfile}")
-    x, y, z, Bx, By, Bz = load_merged_field(ncfile)
+    x, y, z, Bx, By, Bz = load_full_domain(os.path.join(input_folder, ncfile))
+    step = int(ncfile.split("/")[-1].split("_")[3].split(".")[0])
+
+    # Compute footprints
+    footprints = []
+    footprints_class = []
+    lines_by_topo = {"closed": [], "open": []}
 
     if debug:
         print("Bx shape:", Bx.shape)
         print("By shape:", By.shape)
         print("Bz shape:", Bz.shape)
 
-    # Compute footprints
-    footprints = []
-    footprints_class = []
     for seed in seeds:
         traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step)
         traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=-h_step)
-        topo = classify(traj_fwd, traj_bwd, RM, exit_fwd_y, exit_bwd_y)
+        topo = classify(traj_fwd, traj_bwd, RM + dx, exit_fwd_y, exit_bwd_y)
+        if topo not in ["TBD"]:
+            lines_by_topo[topo].append(traj_fwd[:, [0, 2]])
+            lines_by_topo[topo].append(traj_bwd[:, [0, 2]])
+
         for traj in [traj_fwd, traj_bwd]:
             r_end = traj[-1]
             if np.linalg.norm(r_end) <= RM + surface_tol:
@@ -152,46 +166,41 @@ for ncfile in last_files:
         "classification": footprints_class
     })
 
-    all_footprints.append(df_planet)
+    df_csv = os.path.join(output_folder, f"{case}_{step}_footprints_class.csv")
+    df_planet.to_csv(df_csv, index=False)
+    csvsave = datetime.now()
+    print(f"Saved footprints to {df_csv} at {str(csvsave)}")
 
-    # --------------------------
-    # FIELD LINE PLOT (X-Z)
-    # --------------------------
-    colors = {"closed": "blue", "open": "red"}
-    lines_by_topo = {"closed": [], "open": []}
+    if make_line_plots:
+        # --------------------------
+        # FIELD LINE PLOT (X-Z)
+        # --------------------------
+        colors = {"closed": "blue", "open": "red"}
 
-    for seed in seeds:
-        traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step)
-        traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=-h_step)
-        topo = classify(traj_fwd, traj_bwd, RM, exit_fwd_y, exit_bwd_y)
-        if topo not in ["TBD"]:
-            lines_by_topo[topo].append(traj_fwd[:, [0,2]])
-            lines_by_topo[topo].append(traj_bwd[:, [0,2]])
+        fig, ax = plt.subplots(figsize=(7, 7))
+        theta = np.linspace(0, 2 * np.pi, 400)
+        ax.plot(RM * np.cos(theta), RM * np.sin(theta), "k", lw=2)
+        for topo, segments in lines_by_topo.items():
+            if segments:
+                lc = LineCollection(segments, colors=colors[topo], linewidths=0.8, alpha=0.5)
+                ax.add_collection(lc)
+        ax.add_patch(plt.Circle((0, 0), RM, edgecolor='black', facecolor="black", alpha=0.5, linewidth=2))
+        legend_handles = [mlines.Line2D([], [], color="blue", label="Closed"),
+                          mlines.Line2D([], [], color="red", label="Open")]
+        ax.legend(handles=legend_handles, loc="upper right")
 
-    fig, ax = plt.subplots(figsize=(7,7))
-    theta = np.linspace(0, 2*np.pi, 400)
-    ax.plot(RM*np.cos(theta), RM*np.sin(theta), "k", lw=2)
-    for topo, segments in lines_by_topo.items():
-        if segments:
-            lc = LineCollection(segments, colors=colors[topo], linewidths=0.8, alpha=0.5)
-            ax.add_collection(lc)
-    ax.add_patch(plt.Circle((0,0), RM, edgecolor='black', facecolor="black", alpha=0.5, linewidth=2))
-    legend_handles = [mlines.Line2D([],[],color="blue",label="Closed"),
-                      mlines.Line2D([],[],color="red",label="Open")]
-    ax.legend(handles=legend_handles, loc="upper right")
-    step = int(ncfile.split("_")[3])
-    ax.set_xlabel("X [km]")
-    ax.set_ylabel("Z [km]")
-    ax.set_aspect("equal")
-    ax.set_title(f"{case} Magnetic Field-Line Topology, t = {step*0.002} s")
-    ax.set_xlim(-5*RM, 5*RM)
-    ax.set_ylim(-5*RM, 5*RM)
-    plt.tight_layout()
-    output_topo = os.path.join(output_folder,"topology/")
-    os.makedirs(output_topo, exist_ok=True)
-    plt.savefig(os.path.join(output_topo,f"{case}_field_topology_{step}.png"), dpi=150, bbox_inches="tight")
-    print("Saved:\t", os.path.join(output_topo,f"{case}_field_topology_{step}.png"))
-    plt.close()
+        ax.set_xlabel("X [km]")
+        ax.set_ylabel("Z [km]")
+        ax.set_aspect("equal")
+        ax.set_title(f"{case.replace("_", " ")} Magnetic Field-Line Topology, t = {step * 0.002} s")
+        ax.set_xlim(-10 * RM, 10 * RM)
+        ax.set_ylim(-10 * RM, 10 * RM)
+        plt.tight_layout()
+        output_topo = os.path.join(output_folder, "3D_topology/")
+        os.makedirs(output_topo, exist_ok=True)
+        plt.savefig(os.path.join(output_topo, f"{case}_field_topology_{step}.png"), dpi=150, bbox_inches="tight")
+        print("Saved:\t", os.path.join(output_topo, f"{case}_field_topology_{step}.png"))
+        plt.close()
 
     # --------------------------
     # FOOTPRINT PLOT (Hammer)
@@ -223,30 +232,14 @@ for ncfile in last_files:
     ax.set_yticks(lat_ticks_rad)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    ax.set_title(f"{case} Magnetic Footprints, t = {step * 0.002} s")
+    ax.set_title(f"{case.replace("_", " ")} Magnetic Footprints, t = {step * 0.002} s")
     ax.grid(True)
     ax.legend(loc='lower left')
 
     plt.tight_layout()
-    output_ftpt = os.path.join(output_folder, "footprints/")
+    output_ftpt = os.path.join(output_folder, "3D_footprints/")
     os.makedirs(output_ftpt, exist_ok=True)
     plt.savefig(os.path.join(output_ftpt, f"{case}_field_footprints_{step}.png"), dpi=150,
                 bbox_inches="tight")
     print("Saved:\t", os.path.join(output_ftpt, f"{case}_field_footprints_{step}.png"))
     plt.close()
-
-# AGGREGATE ALL FOOTPRINTS
-df_all = pd.concat(all_footprints, ignore_index=True)
-df_all["lat_round"] = df_all["latitude_deg"].round(3)
-df_all["lon_round"] = df_all["longitude_deg"].round(3)
-median_classification = df_all.groupby(["lat_round","lon_round"])["classification"]\
-    .agg(lambda x: x.value_counts().idxmax()).reset_index()
-median_classification.rename(columns={"lat_round":"latitude_deg",
-                                      "lon_round":"longitude_deg",
-                                      "classification":"median_classification"}, inplace=True)
-median_csv = os.path.join(output_folder,f"{case}_last_{N_files}_footprints_median_class.csv")
-median_classification.to_csv(median_csv,index=False)
-print(f"Saved median classification footprints to {median_csv}")
-for topo in ["closed","open"]:
-    n = (median_classification["median_classification"]==topo).sum()
-    print(f"{topo.capitalize()} median count: {n}")

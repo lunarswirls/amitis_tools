@@ -17,10 +17,10 @@ make_plots = True
 # SETTINGS
 # --------------------------
 case = "CPS"
-input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base_largerxdomain_smallergridsize/out/"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/out/"
 ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000.nc")
 
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base_largerxdomain_smallergridsize/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
 os.makedirs(output_folder, exist_ok=True)
 
 # Planet parameters
@@ -30,9 +30,9 @@ else:
     # RM = 2080.0
     RM = 2440.0
 
-dx = 200.0            # grid spacing [km]
+dx = 75.0            # grid spacing [km]
 trace_length = 15 * RM
-surface_tol = 200.0
+surface_tol = 75.0
 
 # Seed settings
 n_lat = 75
