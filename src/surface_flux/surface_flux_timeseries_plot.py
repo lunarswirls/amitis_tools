@@ -26,9 +26,11 @@ elif "HNHV" in case:
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/timeseries_{case.lower()}"
 os.makedirs(output_folder, exist_ok=True)
 
+footprints = None  # valid arguments: 'compute', 'add', or None
+
 R_M = 2440.0        # Mercury radius [km]
 
-LAT_BINS = 180      # [degrees]
+LAT_BINS = 360      # [degrees]
 LON_BINS = 360      # [degrees]
 
 # -------------------------------

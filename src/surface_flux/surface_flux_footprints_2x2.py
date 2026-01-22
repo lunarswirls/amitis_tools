@@ -20,6 +20,7 @@ morph_map = False
 footprints = None  # valid arguments: 'compute', 'add', or None
 
 R_M = 2440.0        # Mercury radius [km]
+dr = 1000.0          # Simulation grid size [km]
 LAT_BINS = 180      # Surface latitude bins
 LON_BINS = 360      # Surface longitude bins
 
@@ -87,9 +88,9 @@ for case in cases:
 
     lat_r = np.deg2rad(lat)
     lon_r = np.deg2rad(lon)
-    Xs = R_M * np.cos(lat_r[:, None]) * np.cos(lon_r[None, :])
-    Ys = R_M * np.cos(lat_r[:, None]) * np.sin(lon_r[None, :])
-    Zs = R_M * np.sin(lat_r[:, None]) * np.ones_like(lon_r[None, :])
+    Xs = (R_M + dr) * np.cos(lat_r[:, None]) * np.cos(lon_r[None, :])
+    Ys = (R_M + dr) * np.cos(lat_r[:, None]) * np.sin(lon_r[None, :])
+    Zs = (R_M + dr) * np.sin(lat_r[:, None]) * np.ones_like(lon_r[None, :])
 
     points_surface = np.stack((Zs, Ys, Xs), axis=-1).reshape(-1, 3)
     interp = RegularGridInterpolator((z, y, x), flux_avg, bounds_error=False, fill_value=np.nan)
@@ -195,13 +196,13 @@ for case in cases:
     ax.set_title(case)
     ax.grid(True, alpha=0.3, color="grey")
 
-fig.suptitle(f"Surface Precipitation at t = {115000 * 0.002} s", fontsize=18, y=0.99)
+fig.suptitle(f"Surface Precipitation at t = {115000 * 0.002} s (Rm + {dr})", fontsize=18, y=0.99)
 # Save figure
 plt.tight_layout()
 if footprints is not None:
     outfile_png = os.path.join(output_folder, f"all_cases_surface_flux_OCB_115000.png")
 else:
-    outfile_png = os.path.join(output_folder, "all_cases_surface_flux_1150000.png")
+    outfile_png = os.path.join(output_folder, f"all_cases_surface_flux_1150000_Rm{dr}.png")
 
 if morph_map:
     outfile_png = outfile_png.replace("all_", "morph_map_all_")

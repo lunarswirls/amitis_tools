@@ -107,7 +107,7 @@ log_flux_surface = np.log10(flux_surface_masked)
 # -------------------------------
 # Plot
 # -------------------------------
-fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2, figsize=(12, 6), subplot_kw={"projection": "hammer"})
+fig, ((ax0, ax1, ax2)) = plt.subplots(3, 1, figsize=(12, 8), subplot_kw={"projection": "hammer"})
 
 # Plot flux
 lon_grid, lat_grid = np.meshgrid(lon_r, lat_r)  # radians
@@ -116,31 +116,36 @@ lon_grid = np.where(lon_grid > np.pi, lon_grid - 2*np.pi, lon_grid)
 
 # total density
 # ax0 = axes[0]
-sc = ax0.pcolormesh(lon_grid, lat_grid, tot_den, cmap="viridis", shading="auto")
+sc = ax0.pcolormesh(lon_grid, lat_grid, tot_den, cmap="plasma", shading="auto")
 cbar = fig.colorbar(sc, ax=ax0, orientation="horizontal", pad=0.05, shrink=0.5)
 cbar.set_label(r"N [cm$^{-3}$])")
 ax0.set_title(f"Total Density")
 
 # v_r
 # ax1 = axes[1]
-sc = ax1.pcolormesh(lon_grid, lat_grid, v_r, cmap="viridis", shading="auto")
+sc = ax1.pcolormesh(lon_grid, lat_grid, v_r, cmap="cividis", shading="auto")
 cbar = fig.colorbar(sc, ax=ax1, orientation="horizontal", pad=0.05, shrink=0.5)
 cbar.set_label(r"$V_r$ [km/s])")
 ax1.set_title(f"Radial Velocity")
 
 # UNWEIGHTED surface flux
 # ax2 = axes[2]
-sc = ax2.pcolormesh(lon_grid, lat_grid, uw_log_flux_surface, cmap="viridis", shading="auto")
-cbar = fig.colorbar(sc, ax=ax2, orientation="horizontal", pad=0.05, shrink=0.5)
-cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
-ax2.set_title(f"Unweighted Surface Flux")
+# sc = ax2.pcolormesh(lon_grid, lat_grid, uw_log_flux_surface, cmap="viridis", shading="auto")
+# cbar = fig.colorbar(sc, ax=ax2, orientation="horizontal", pad=0.05, shrink=0.5)
+# cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
+# ax2.set_title(f"Unweighted Surface Flux")
 
 # WEIGHTED surface flux
 # ax3 = axes[3]
-sc = ax3.pcolormesh(lon_grid, lat_grid, log_flux_surface, cmap="viridis", shading="auto")
-cbar = fig.colorbar(sc, ax=ax3, orientation="horizontal", pad=0.05, shrink=0.5)
+# sc = ax3.pcolormesh(lon_grid, lat_grid, log_flux_surface, cmap="viridis", shading="auto")
+# cbar = fig.colorbar(sc, ax=ax3, orientation="horizontal", pad=0.05, shrink=0.5)
+# cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
+# ax3.set_title(f"Weighted Surface Flux")
+
+sc = ax2.pcolormesh(lon_grid, lat_grid, log_flux_surface, cmap="viridis", shading="auto")
+cbar = fig.colorbar(sc, ax=ax2, orientation="horizontal", pad=0.05, shrink=0.5)
 cbar.set_label(r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])")
-ax3.set_title(f"Weighted Surface Flux")
+ax2.set_title(f"Surface Flux")
 
 # Longitude ticks (-170 to 170 every n °)
 lon_ticks_deg = np.arange(-120, 121, 60)
