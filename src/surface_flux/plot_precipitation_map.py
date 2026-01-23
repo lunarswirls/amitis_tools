@@ -1,204 +1,385 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os, glob
+from pathlib import Path
 import numpy as np
-from netCDF4 import Dataset
-from matplotlib.pyplot import figure, subplot, colorbar, show
-import cartopy.crs as ccrs
-from math import pi
+import matplotlib.pyplot as plt
+from pyamitis.amitis_particle import *
 
 # -----------------------------
 # User parameters
 # -----------------------------
-main_path = '/Volumes/data_backup/mercury/extreme/CPN_Base/05/particles/'
-species = np.array(['H+', 'He++'])
-sim_ppc = [24, 11]
+main_path = '/Volumes/data_backup/mercury/extreme/RPN_Base/05/'
+species = np.array(['H+', 'He++'])  # The order is important and it should be based on Amitis.inp file
+sim_ppc = [24, 11]  # Number of particles per species, based on Amitis.inp
 sim_den = [38.0e6, 1.0e6]
-sim_dx = sim_dy = sim_dz = 75.e3
-sim_robs = 2440.e3
-select_R = 2480.e3
-dphi = 2.
-dtheta = 2.
+sim_vel = [400.e3, 400.e3]
 
-# -----------------------------
-# Function: combine NetCDF files
-# -----------------------------
-def combine_netcdfs():
-    files = sorted(glob.glob(os.path.join(main_path, "*.nc")))
-    print(f"Found {len(files)} NetCDF files.")
+sim_dx = 75.e3  # simulation cell size based on Amitis.inp
+sim_dy = 75.e3  # simulation cell size based on Amitis.inp
+sim_dz = 75.e3  # simulation cell size based on Amitis.inp
+sim_robs = 2440.e3  # obstacle radius based on Amitis.inp
 
-    # Initialize empty arrays
-    prx, pry, prz = np.array([]), np.array([]), np.array([])
-    pvx, pvy, pvz = np.array([]), np.array([]), np.array([])
-    psid = np.array([])
+select_R = 2480.e3  # the radius of a sphere above the surface for particle selection
+dphi = 2.  # delta_phi   [0, 360] deg   (0:+x, 90:+y,  180:-x, 270:-y)
+dtheta = 2.  # delta_theta [0, 180] deg   (0:+z)
 
-    for f in files:
-        print("Reading:", f)
-        with Dataset(f, 'r') as nc:
-            prx  = np.append(prx, nc.variables['rx'][:])
-            pry  = np.append(pry, nc.variables['ry'][:])
-            prz  = np.append(prz, nc.variables['rz'][:])
-            pvx  = np.append(pvx, nc.variables['vx'][:])
-            pvy  = np.append(pvy, nc.variables['vy'][:])
-            pvz  = np.append(pvz, nc.variables['vz'][:])
-            psid = np.append(psid, nc.variables['sid'][:])
+sub_filepath = main_path + 'particles/'
+sub_filename = 'Subset_RPN_Base'
 
-    # Filter particles within selection radius
-    idx = np.where(prx**2 + pry**2 + prz**2 <= select_R**2)[0]
-    prx, pry, prz = prx[idx], pry[idx], prz[idx]
-    pvx, pvy, pvz = pvx[idx], pvy[idx], pvz[idx]
-    psid = psid[idx]
+all_particles_directory = main_path + 'precipitation/'
+os.makedirs(all_particles_directory, exist_ok=True)
+all_particles_filename = all_particles_directory + "all_particles_at_surface.npz"
+moments_filename = all_particles_directory + "moments"
 
-    print("Total number of particles after selection:", prx.size)
+def combine_all_files():
+    # Get all subset files
+    subset_filelist = np.array(sorted(glob.glob(sub_filepath + sub_filename + "*.npz")))
 
-    return prx, pry, prz, pvx, pvy, pvz, psid
+    # Find unique subset files per simulation time step
+    i = 0
+    for f in subset_filelist:
+        subset_filelist[i] = f[:-9]  # Remove the last 9 character of each file name
+        i = i + 1
+    subset_filelist = np.unique(subset_filelist, axis=0)
+    print("Number of subsets series: ", subset_filelist.size)
+
+    prx = []  # particle position x
+    pry = []  # particle position y
+    prz = []  # particle position z
+    pvx = []  # particle velocity x
+    pvy = []  # particle velocity y
+    pvz = []  # particle velocity z
+    psid = []  # particle sid
+
+    file_counter = 0
+    for f in (subset_filelist):
+        stem = Path(f).stem  # filename without extension
+        sim_step = stem.split("_")[3]  # 4th field
+
+        print("---------- " + sim_step + " ----------")
+
+        obj_sub = amitis_particle(sub_filepath, sub_filename, int(sim_step))
+        obj_sub.load_particle_data(None)
+
+        idx = np.where((obj_sub.rx ** 2 + obj_sub.ry ** 2 + obj_sub.rz ** 2 <= select_R ** 2))[0]
+
+        prx = np.append(prx, obj_sub.rx[idx])
+        pry = np.append(pry, obj_sub.ry[idx])
+        prz = np.append(prz, obj_sub.rz[idx])
+
+        pvx = np.append(pvx, obj_sub.vx[idx])
+        pvy = np.append(pvy, obj_sub.vy[idx])
+        pvz = np.append(pvz, obj_sub.vz[idx])
+
+        psid = np.append(psid, obj_sub.sid[idx])
+
+        file_counter = file_counter + 1
+
+    # convert list to a numpy array
+    prx = np.array(prx)
+    pry = np.array(pry)
+    prz = np.array(prz)
+    pvx = np.array(pvx)
+    pvy = np.array(pvy)
+    pvz = np.array(pvz)
+    psid = np.array(psid)
+
+    print("Total number of particles: ", prx.size)
+
+    np.savez(all_particles_filename,
+             prx=prx,
+             pry=pry,
+             prz=prz,
+             pvx=pvx,
+             pvy=pvy,
+             pvz=pvz,
+             psid=psid,
+             num_files=file_counter,
+             selected_radius=select_R
+             )
+    print("Wrote file to ", all_particles_filename)
 
 
-# -----------------------------
-# Function to calculate moments
-# -----------------------------
-def calc_moments_at_surface(prx, pry, prz, pvx, pvy, pvz, psid, specie_id):
-    # Select particles by species
-    idx = np.where((psid == specie_id) &
-                   (prx**2 + pry**2 + prz**2 <= select_R**2))[0]
+def calc_moments_at_surface(specie_id):
+    with np.load(all_particles_filename) as data:
+        prx = data["prx"]
+        pry = data["pry"]
+        prz = data["prz"]
+        pvx = data["pvx"]
+        pvy = data["pvy"]
+        pvz = data["pvz"]
+        psid = data["psid"]
+        num_files = data["num_files"]
+        selected_radius = data["selected_radius"]
 
-    rx = prx[idx]
-    ry = pry[idx]
-    rz = prz[idx]
-    vx = pvx[idx]
-    vy = pvy[idx]
-    vz = pvz[idx]
+    if (selected_radius < select_R):
+        print("Selected radius in particle file %e is smaller than the select_R" % (selected_radius))
+        raise
 
-    tnp = rx.size
-    print(f"Total number of particles for species {species[specie_id]}: {tnp}")
+        # Select for specie
+    id = np.where((psid == specie_id) &
+                  (prx ** 2 + pry ** 2 + prz ** 2 <= select_R ** 2))[0]
+    prx = prx[id]
+    pry = pry[id]
+    prz = prz[id]
+    pvx = pvx[id]
+    pvy = pvy[id]
+    pvz = pvz[id]
 
-    # Initialize bins
-    nx = int(360/dphi) + 2
-    ny = int(180/dtheta) + 2
-    cnts = np.zeros((nx, ny))
-    velx = np.zeros((nx, ny))
-    vely = np.zeros((nx, ny))
-    velz = np.zeros((nx, ny))
-    velr = np.zeros((nx, ny))
-    den  = np.zeros((nx-2, ny-2))
+    tnp = prx.size  # total number of particles
+    print("Total number of particles for species %s is %d" % (species[specie_id], tnp))
 
-    # Bin particles
-    for i in range(tnp):
-        rmag = np.sqrt(rx[i]**2 + ry[i]**2 + rz[i]**2)
-        theta = np.arccos(rz[i]/rmag) * 180/pi
-        phi   = np.arctan2(ry[i], rx[i]) * 180/pi
-        if phi < 0: phi += 360
+    # pre-allocate memory + 2 guard cells
+    cnts = np.zeros((int(360 / dphi) + 2, int(180 / dtheta) + 2))
+    velx = np.zeros((int(360 / dphi) + 2, int(180 / dtheta) + 2))
+    vely = np.zeros((int(360 / dphi) + 2, int(180 / dtheta) + 2))
+    velz = np.zeros((int(360 / dphi) + 2, int(180 / dtheta) + 2))
+    velr = np.zeros((int(360 / dphi) + 2, int(180 / dtheta) + 2))
+    den = np.zeros((int(360 / dphi), int(180 / dtheta)))
 
-        xi = int(np.floor(phi/dphi - 0.5)) + 1
-        yi = int(np.floor(theta/dtheta - 0.5)) + 1
+    # for all selected particles, calculate counts on the surface
+    for idx in range(0, tnp):
+        if (idx > 0 and idx % 10000 == 0):
+            print("%-10d particles out of  %-10d processed!" % (idx, tnp))
 
-        u = xi + 1
-        v = yi + 1
+        rmag = np.sqrt(prx[idx] ** 2 + pry[idx] ** 2 + prz[idx] ** 2)
+        theta = np.arccos(prz[idx] / rmag) * (180. / np.pi)
+        phi = np.arctan2(pry[idx], prx[idx]) * (180. / np.pi)
+        if (phi < 0):
+            phi += 360.
 
-        x = xi + 0.5 - (phi/dphi)
-        y = yi + 0.5 - (theta/dtheta)
+        i = int(np.floor(phi / dphi - 0.5)) + 1
+        j = int(np.floor(theta / dtheta - 0.5)) + 1
 
-        r_dot_v = abs(rx[i]*vx[i] + ry[i]*vy[i] + rz[i]*vz[i])/rmag
+        u = i + 1
+        v = j + 1
 
-        # distribute particle to four surrounding cells (bilinear)
-        c_list = [(xi, yi, (1-x)*(1-y)), (u, yi, x*(1-y)),
-                  (xi, v, (1-x)*y), (u, v, x*y)]
+        x = i + 0.5 - (phi / dphi)
+        y = j + 0.5 - (theta / dtheta)
 
-        for ii, jj, c in c_list:
-            cnts[ii, jj]  += c
-            velx[ii, jj] += c*vx[i]
-            vely[ii, jj] += c*vy[i]
-            velz[ii, jj] += c*vz[i]
-            velr[ii, jj] += c*r_dot_v
+        if (x < 0 or x > 1 or y < 0 or y > 1):
+            print("r=(%+-16.8f, %+-16.8f, %+-16.8f), (x,y)=(%+-16.8f, %+-16.8f) \n", prx[idx], pry[idx], prz[idx], x, y)
+            raise ("Error in x or y!")
 
-    # Correct guard cells (wrap around phi)
-    cnts[1,:] += cnts[-1,:]
-    velx[1,:] += velx[-1,:]
-    vely[1,:] += vely[-1,:]
-    velz[1,:] += velz[-1,:]
-    velr[1,:] += velr[-1,:]
+        c_sum = 0.0
+        r_dot_v = abs(prx[idx] * pvx[idx] + pry[idx] * pvy[idx] + prz[idx] * pvz[idx]) / rmag
 
-    cnts = cnts[1:-1, 1:-1]
-    velx = velx[1:-1, 1:-1]
-    vely = vely[1:-1, 1:-1]
-    velz = velz[1:-1, 1:-1]
-    velr = velr[1:-1, 1:-1]
+        c = x * y
+        c_sum += c
+        cnts[i, j] += c
+        velx[i, j] += c * pvx[idx]
+        vely[i, j] += c * pvy[idx]
+        velz[i, j] += c * pvz[idx]
+        velr[i, j] += c * r_dot_v
 
-    # Weight and density
-    weight = ((sim_dx*sim_dy*sim_dz)/sim_ppc[specie_id])
+        c = x * (1.0 - y)
+        c_sum += c
+        cnts[i, v] += c
+        velx[i, v] += c * pvx[idx]
+        vely[i, v] += c * pvy[idx]
+        velz[i, v] += c * pvz[idx]
+        velr[i, v] += c * r_dot_v
+
+        c = (1.0 - x) * y
+        c_sum += c
+        cnts[u, j] += c
+        velx[u, j] += c * pvx[idx]
+        vely[u, j] += c * pvy[idx]
+        velz[u, j] += c * pvz[idx]
+        velr[u, j] += c * r_dot_v
+
+        c = (1.0 - x) * (1.0 - y)
+        c_sum += c
+        cnts[u, v] += c
+        velx[u, v] += c * pvx[idx]
+        vely[u, v] += c * pvy[idx]
+        velz[u, v] += c * pvz[idx]
+        velr[u, v] += c * r_dot_v
+
+        if (c_sum < 0.99999 or c_sum > 1.00001):
+            raise ("Error c_sum \n");
+
+    print("All particles processed successfully!")
+
+    # correct for the guard cells
+    cnts[1, :] += cnts[int(360 / dphi) + 1, :]
+    velx[1, :] += velx[int(360 / dphi) + 1, :]
+    vely[1, :] += vely[int(360 / dphi) + 1, :]
+    velz[1, :] += velz[int(360 / dphi) + 1, :]
+    velr[1, :] += velr[int(360 / dphi) + 1, :]
+
+    cnts[int(360 / dphi), :] += cnts[0, :]
+    velx[int(360 / dphi), :] += velx[0, :]
+    vely[int(360 / dphi), :] += vely[0, :]
+    velz[int(360 / dphi), :] += velz[0, :]
+    velr[int(360 / dphi), :] += velr[0, :]
+
+    cnts = cnts[1:int(360 / dphi) + 1, 1:int(180 / dtheta) + 1]
+    velx = velx[1:int(360 / dphi) + 1, 1:int(180 / dtheta) + 1]
+    vely = vely[1:int(360 / dphi) + 1, 1:int(180 / dtheta) + 1]
+    velz = velz[1:int(360 / dphi) + 1, 1:int(180 / dtheta) + 1]
+    velr = velr[1:int(360 / dphi) + 1, 1:int(180 / dtheta) + 1]
+
+    # move the map and make the subsolar point in the middle of the map
+    tmp = np.zeros((int(360 / dphi), int(180 / dtheta)))
+    tmp[0:int(tmp.shape[0] / 2), :] = cnts[int(tmp.shape[0] / 2):int(tmp.shape[0]), :]
+    tmp[int(tmp.shape[0] / 2):int(tmp.shape[0]), :] = cnts[0:int(tmp.shape[0] / 2), :]
+    cnts = tmp
+
+    tmp = np.zeros((int(360 / dphi), int(180 / dtheta)))
+    tmp[0:int(tmp.shape[0] / 2), :] = velx[int(tmp.shape[0] / 2):int(tmp.shape[0]), :]
+    tmp[int(tmp.shape[0] / 2):int(tmp.shape[0]), :] = velx[0:int(tmp.shape[0] / 2), :]
+    velx = tmp
+
+    tmp = np.zeros((int(360 / dphi), int(180 / dtheta)))
+    tmp[0:int(tmp.shape[0] / 2), :] = vely[int(tmp.shape[0] / 2):int(tmp.shape[0]), :]
+    tmp[int(tmp.shape[0] / 2):int(tmp.shape[0]), :] = vely[0:int(tmp.shape[0] / 2), :]
+    vely = tmp
+
+    tmp = np.zeros((int(360 / dphi), int(180 / dtheta)))
+    tmp[0:int(tmp.shape[0] / 2), :] = velz[int(tmp.shape[0] / 2):int(tmp.shape[0]), :]
+    tmp[int(tmp.shape[0] / 2):int(tmp.shape[0]), :] = velz[0:int(tmp.shape[0] / 2), :]
+    velz = tmp
+
+    tmp = np.zeros((int(360 / dphi), int(180 / dtheta)))
+    tmp[0:int(tmp.shape[0] / 2), :] = velr[int(tmp.shape[0] / 2):int(tmp.shape[0]), :]
+    tmp[int(tmp.shape[0] / 2):int(tmp.shape[0]), :] = velr[0:int(tmp.shape[0] / 2), :]
+    velr = tmp
+
+    # calculate particles weight and account for the spherical coordinate system
+    weight = ((sim_dx * sim_dy * sim_dz) / sim_ppc[specie_id]) / num_files
     dr = select_R - sim_robs
-    dv = (select_R**2)*dr*(dphi*pi/180)*(dtheta*pi/180)
+    dv = (select_R ** 2) * dr * (dphi * np.pi / 180.) * (dtheta * np.pi / 180.)
 
-    for i in range(cnts.shape[0]):
-        den[i,:] = cnts[i,:] * sim_den[specie_id] * weight / (dv*np.sin((i+0.5)*dtheta*pi/180))
+    # print( "Weight: %e" %(weight) )
+    # convert counts to density
+    for i in range(0, int(180. / dtheta)):
+        den[:, i] = cnts[:, i] * sim_den[specie_id] * weight / (dv * np.sin((i + 0.5) * dtheta * np.pi / 180.))
 
-    # Average velocities
-    mask = cnts > 0
-    velx[mask] /= cnts[mask]
-    vely[mask] /= cnts[mask]
-    velz[mask] /= cnts[mask]
-    velr[mask] /= cnts[mask]
+    # correct velocity; and account for division by zero when there is no particle
+    for i in range(0, int(360 / dphi)):
+        for j in range(0, int(180 / dtheta)):
+            if (cnts[i, j] > 0):
+                velx[i, j] /= cnts[i, j]
+                vely[i, j] /= cnts[i, j]
+                velz[i, j] /= cnts[i, j]
+                velr[i, j] /= cnts[i, j]
 
-    vmag = np.sqrt(velx**2 + vely**2 + velz**2)
+                phi = (i * dphi + 0.5) * np.pi / 180.
+                theta = (j * dtheta + 0.5) * np.pi / 180.
+
+                vect_normal_x = np.sin(theta) * np.cos(phi)
+                vect_normal_y = np.sin(theta) * np.sin(phi)
+                vect_normal_z = np.cos(theta)
+
+            else:
+                velx[i, j] = 0.0
+                vely[i, j] = 0.0
+                velz[i, j] = 0.0
+                velr[i, j] = 0.0
+
+    vmag = np.sqrt(velx ** 2 + vely ** 2 + velz ** 2)
     flxr = velr * den
 
-    # Return all relevant moments
-    return cnts, den, velx, vely, velz, velr, vmag, flxr
+    np.savez(moments_filename + "_" + species[specie_id] + ".npz",
+             prx=prx, pry=pry, prz=prz,
+             pvx=pvx, pvy=pvy, pvz=pvz,
+             select_R=select_R, dphi=dphi, dtheta=dtheta,
+             specie=species[specie_id],
+             sim_den=sim_den[specie_id],
+             sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
+             num_files=num_files,
+             sim_ppc=sim_ppc[specie_id], sim_robs=sim_robs,
+             weight=weight, dr=dr, dv=dv,
+             cnts=cnts, den=den,
+             velx=velx, vely=vely, velz=velz,
+             vmag=vmag, velr=velr, flxr=flxr)
 
 
-def plot_moments_at_surface(cnts, den, velr, flxr, specie_id):
-    interp = 'bilinear'
-
-    # Avoid log10(0) warnings
-    log_cnts = np.where(cnts>0, np.log10(cnts), np.nan)
-    log_den  = np.where(den>0, np.log10(den), np.nan)
-    log_velr = np.where(velr>0, np.log10(velr), np.nan)
-    log_flxr = np.where(flxr>0, np.log10(flxr), np.nan)
-
-    fig = figure(species[specie_id], figsize=(14,9))
-
-    # # particles
-    ax = subplot(221, projection=ccrs.Aitoff())
-    ax.gridlines(color='black', linestyle='dotted')
-    im = ax.imshow(np.flipud(log_cnts.T), origin="upper", interpolation=interp,
-                   extent=(-180,180,-90,90), transform=ccrs.PlateCarree())
-    colorbar(im, extend='neither').set_label("# particles")
-
-    # Density
-    ax = subplot(222, projection=ccrs.Aitoff())
-    ax.gridlines(color='black', linestyle='dotted')
-    im = ax.imshow(np.flipud(log_den.T), origin="upper", interpolation=interp,
-                   extent=(-180,180,-90,90), transform=ccrs.PlateCarree())
-    colorbar(im, extend='min').set_label("Density")
-
-    # Radial velocity
-    ax = subplot(223, projection=ccrs.Aitoff())
-    ax.gridlines(color='black', linestyle='dotted')
-    im = ax.imshow(np.flipud(log_velr.T), origin="upper", interpolation=interp,
-                   extent=(-180,180,-90,90), transform=ccrs.PlateCarree())
-    colorbar(im, extend='min').set_label("Radial velocity")
-
-    # Flux
-    ax = subplot(224, projection=ccrs.Aitoff())
-    ax.gridlines(color='black', linestyle='dotted')
-    im = ax.imshow(np.flipud(log_flxr.T), origin="upper", interpolation=interp,
-                   extent=(-180,180,-90,90), transform=ccrs.PlateCarree())
-    colorbar(im, extend='min').set_label("Flux")
+def safe_log10(arr, vmin=1e-30):
+    out = np.full_like(arr, np.nan, dtype=float)
+    mask = arr > vmin
+    out[mask] = np.log10(arr[mask])
+    return out
 
 
-# -----------------------------
-# Main script
-# -----------------------------
-if __name__ == '__main__':
-    # Combine all NetCDFs into arrays
-    prx, pry, prz, pvx, pvy, pvz, psid = combine_netcdfs()
+def plot_moments_at_surface(specie_id):
 
-    # Compute moments for species 0
-    cnts, den, velx, vely, velz, velr, vmag, flxr = calc_moments_at_surface(
-        prx, pry, prz, pvx, pvy, pvz, psid, specie_id=0
+    with np.load(moments_filename + "_" + species[specie_id] + ".npz") as data:
+        cnts   = data["cnts"]
+        den    = data["den"]
+        velr   = data["velr"]
+        flxr   = data["flxr"]
+        dphi   = data["dphi"]
+        dtheta = data["dtheta"]
+
+    # -----------------------------
+    # Log-safe quantities
+    # -----------------------------
+    log_cnts = safe_log10(cnts)
+    log_den  = safe_log10(den / sim_den[specie_id])
+    log_vel  = safe_log10(velr / sim_vel[specie_id])
+    log_flx  = safe_log10(flxr / (sim_den[specie_id] * sim_vel[specie_id]))
+
+    # -----------------------------
+    # Grid (RADIANS for Hammer)
+    # -----------------------------
+    nlon, nlat = cnts.shape
+    lon = np.linspace(-np.pi, np.pi, nlon)
+    lat = np.linspace(-np.pi/2, np.pi/2, nlat)
+    lon2d, lat2d = np.meshgrid(lon, lat, indexing="ij")
+
+    # -----------------------------
+    # Plot setup
+    # -----------------------------
+    fig, axes = plt.subplots(
+        2, 2, figsize=(14, 9),
+        subplot_kw={"projection": "hammer"}
     )
 
-    # Plot results
-    plot_moments_at_surface(cnts, den, velr, flxr, specie_id=0)
-    show()
+    fig.patch.set_facecolor("white")
+    axes = axes.flatten()
 
+    fields = [
+        (log_cnts, (0, 4),   "viridis", "# particles"),
+        (log_den,  (-2, 1),  "cividis", r"$n/n_0$"),
+        (log_vel,  (-1, 1),  "plasma",  r"$v/v_0$"),
+        (log_flx,  (-2, 1),  "jet",     r"$F/F_0$")
+    ]
+
+    titles = ["Counts", "Density", "Velocity", "Flux"]
+
+    for ax, (data, clim, cmap, cblabel), title in zip(axes, fields, titles):
+        ax.set_facecolor("white")
+        ax.grid(True, linestyle="dotted", color="gray")
+
+        pcm = ax.pcolormesh(
+            lon2d,
+            lat2d,
+            data.T,
+            cmap=cmap,
+            shading="auto"
+        )
+        pcm.set_clim(*clim)
+
+        cbar = plt.colorbar(
+            pcm,
+            ax=ax,
+            orientation="horizontal",
+            pad=0.05,
+            shrink=0.85
+        )
+        cbar.set_label(cblabel, fontsize=14)
+        cbar.ax.tick_params(labelsize=12)
+
+        ax.set_title(title, fontsize=20)
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == '__main__':
+    combine_all_files()
+    calc_moments_at_surface(0)
+    plot_moments_at_surface(0)
