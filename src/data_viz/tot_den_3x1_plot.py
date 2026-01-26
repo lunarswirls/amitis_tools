@@ -18,7 +18,7 @@ z_plane = 0.0  # meters
 
 if "Base" in case:
     base_in_dir = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/"
-    c_max = 60
+    c_max = 100
 elif "HNHV" in case:
     base_in_dir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/"
     c_max = 400
@@ -118,7 +118,7 @@ for sim_step in sim_steps:
     near_planes = []
 
     for ax, use_slice in zip(axes, use_slices):
-        input_folder = os.path.join(base_in_dir, f"all_{use_slice}")
+        input_folder = os.path.join(base_in_dir, f"fig_{use_slice}")
         f = os.path.join(input_folder, f"Amitis_{case}_{filetime}_{use_slice}_comp.nc")
         # input_folder = os.path.join(base_in_dir, f"object")
         # f = os.path.join(input_folder, f"Amitis_{case}_{filetime}_xz_comp.nc")

@@ -11,24 +11,25 @@ import matplotlib.lines as mlines
 from src.field_topology.topology_utils import *
 
 debug = False
-make_plots = True
+make_line_plot = False
+make_foot_plot = True
 
 # --------------------------
 # SETTINGS
 # --------------------------
-case = "CPS"
-input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}_Base/out/"
-ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000.nc")
+case = "CPN_Base_largerxdomain_smallergridsize"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}/out/"
+if "larger" in case:
+    fname = case.split("_")[0] + "_" + case.split("_")[1]
+else:
+    fname = case
+ncfile = os.path.join(input_folder, f"Amitis_{fname}_115000.nc")
 
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_Base/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}/"
 os.makedirs(output_folder, exist_ok=True)
 
 # Planet parameters
-if case in ["RPN", "RPS"]:
-    RM = 2440.0  # Mercury radius [km]
-else:
-    # RM = 2080.0
-    RM = 2440.0
+RM = 2440.0
 
 dx = 75.0            # grid spacing [km]
 trace_length = 15 * RM
@@ -166,7 +167,7 @@ df_planet.to_csv(df_csv,index=False)
 csvsave = datetime.now()
 print(f"Saved footprints to {df_csv} at {str(csvsave)}")
 
-if make_plots:
+if make_line_plot:
     # --------------------------
     # FIELD LINE PLOT (X-Z)
     # --------------------------
@@ -187,9 +188,9 @@ if make_plots:
     ax.set_xlabel("X [km]")
     ax.set_ylabel("Z [km]")
     ax.set_aspect("equal")
-    ax.set_title(f"{case} Magnetic Field-Line Topology, t = {step*0.002} s")
-    ax.set_xlim(-10*RM, 10*RM)
-    ax.set_ylim(-10*RM, 10*RM)
+    ax.set_title(f"{case.replace("_", " ")} (Larger X Domain) Magnetic Field-Line Topology, t = {step*0.002} s")
+    ax.set_xlim(-20*RM, 20*RM)
+    ax.set_ylim(-20*RM, 20*RM)
     plt.tight_layout()
     output_topo = os.path.join(output_folder,"3D_topology/")
     os.makedirs(output_topo, exist_ok=True)
@@ -197,6 +198,7 @@ if make_plots:
     print("Saved:\t", os.path.join(output_topo,f"{case}_field_topology_{step}.png"))
     plt.close()
 
+if make_foot_plot:
     # --------------------------
     # FOOTPRINT PLOT (Hammer)
     # --------------------------
@@ -227,7 +229,11 @@ if make_plots:
     ax.set_yticks(lat_ticks_rad)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    ax.set_title(f"{case} (Larger X Domain) Magnetic Footprints, t = {step * 0.002} s")
+    if "larger" in case:
+        tstring = f"{fname.replace("_", " ")} (Larger X Domain) Magnetic Footprints, t = {step * 0.002} s"
+    else:
+        tstring = f"{fname.replace("_", " ")} Magnetic Footprints, t = {step * 0.002} s"
+    ax.set_title(tstring)
     ax.grid(True)
     ax.legend(loc='lower left')
 

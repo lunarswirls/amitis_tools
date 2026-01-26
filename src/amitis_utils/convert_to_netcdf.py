@@ -1,13 +1,13 @@
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
-case = "CPS"
+case = "CPN"
 sim_step = 350000
 filename = f'Amitis_{case}_HNHV_' + "%06d"%(sim_step)
 compress = True
 # obj_hdf  = amitis_hdf(f'/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/10/out/', filename + '.h5')
 
-input_folder = f"/Users/danywaller/Projects/mercury/extreme/CPS_Base_largerxdomain_smallergridsize/out/"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/CPN_Base_largerxdomain_smallergridsize/out/"
 obj_hdf = amitis_hdf(input_folder, f"Amitis_{case}_Base_115000.h5")
 
 debug = False

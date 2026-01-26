@@ -4,14 +4,14 @@ from pathlib import Path
 import os
 import numpy as np
 
-case = "RPN_Base"
+case = "RPS_Base"
 
 folder = Path(f"/Volumes/data_backup/mercury/extreme/{case}/05/subset/")
 outdir = f"/Volumes/data_backup/mercury/extreme/{case}/05/particles/"
 os.makedirs(outdir, exist_ok=True)
 
-# sim_steps = range(100000, 115000 + 1, 1000)
-sim_steps = range(100000, 107000 + 1, 1000)
+sim_steps = range(100000, 115000 + 1, 1000)
+# sim_steps = range(114000, 115000 + 1, 1000)
 
 # Initialize cached coordinates
 x = y = z = None
@@ -124,3 +124,11 @@ for sim_step in sim_steps:
     )
 
     print(f"NPZ saved: {outfile_npz}")
+
+    # -----------------------------
+    # Clear memory
+    # -----------------------------
+    del rx, ry, rz, vx, vy, vz, sid, time
+    for d in loaded:
+        d.close()  # Close memory-mapped npz
+    del loaded
