@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_Base"
+case = "CPN_HNHV"
 
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 n_slices = len(use_slices)       # number of requested slices

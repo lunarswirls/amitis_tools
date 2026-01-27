@@ -14,7 +14,8 @@ debug = False
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_Base"
+case = "CPN_HNHV"
+post_icme = True
 
 if "Base" in case:
     base_dir = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/"
@@ -60,7 +61,13 @@ PLOT_BG = {
 }
 
 # take last 15-ish seconds
-sim_steps = list(range(98000, 115000 + 1, 1000))
+if "Base" in case:
+    sim_steps = list(range(98000, 115000 + 1, 1000))
+elif "HNHV" in case:
+    if post_icme:
+        sim_steps = range(165000, 197000 + 1, 1000)  # sheath
+    else:
+        sim_steps = range(127000, 153000 + 1, 1000)  # shock
 
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_id_timeseries/{case}/"
 os.makedirs(out_dir, exist_ok=True)

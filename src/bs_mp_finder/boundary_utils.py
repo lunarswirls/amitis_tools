@@ -62,25 +62,25 @@ def extract_slice_fields(ds: xr.Dataset, use_slice: str):
     BY = ds["By_tot"].sel(**sel_kw, method="nearest").squeeze()  # [units: nT]
     BZ = ds["Bz_tot"].sel(**sel_kw, method="nearest").squeeze()  # [units: nT]
 
-    vx01 = ds["vx01"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vy01 = ds["vy01"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vz01 = ds["vz01"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
+    vx_proton = ds["vx01"].sel(**sel_kw, method="nearest").squeeze() + ds["vx02"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
+    vy_proton = ds["vy01"].sel(**sel_kw, method="nearest").squeeze() + ds["vy02"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
+    vz_proton = ds["vz01"].sel(**sel_kw, method="nearest").squeeze() + ds["vz02"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
 
-    vx03 = ds["vx03"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vy03 = ds["vy03"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vz03 = ds["vz03"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
+    vx_alpha = ds["vx03"].sel(**sel_kw, method="nearest").squeeze() + ds["vx04"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
+    vy_alpha = ds["vy03"].sel(**sel_kw, method="nearest").squeeze() + ds["vy04"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
+    vz_alpha = ds["vz03"].sel(**sel_kw, method="nearest").squeeze() + ds["vz04"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
 
-    # pre-ICME protons
-    den01 = ds["den01"].sel(**sel_kw, method="nearest").squeeze()  # [units: cm^-3]
+    # pre-ICME protons + ICME protons
+    den_proton = ds["den01"].sel(**sel_kw, method="nearest").squeeze() + ds["den02"].sel(**sel_kw, method="nearest").squeeze()  # [units: cm^-3]
 
-    # pre-ICME alphas
-    den03 = ds["den03"].sel(**sel_kw, method="nearest").squeeze()  # [units: cm^-3]
+    # pre-ICME alphas + ICME alphas
+    den_alpha = ds["den03"].sel(**sel_kw, method="nearest").squeeze() + ds["den04"].sel(**sel_kw, method="nearest").squeeze()  # [units: cm^-3]
 
     JX = ds["Jx"].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
     JY = ds["Jy"].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
     JZ = ds["Jz"].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
 
-    return BX,BY,BZ,vx01,vy01,vz01,vx03,vy03,vz03,den01,den03,JX,JY,JZ
+    return BX,BY,BZ,vx_proton,vy_proton,vz_proton,vx_alpha,vy_alpha,vz_alpha,den_proton,den_alpha,JX,JY,JZ
 
 
 def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, case: str, sim_step: float, debug: bool=False):

@@ -13,16 +13,20 @@ from src.field_topology.topology_utils import *
 # ======================
 # USER PARAMETERS
 # ======================
-case = "CPN_Base"
+case = "CPS_Base_largerxdomain_smallergridsize"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/{case}/out/"
+if "larger" in case:
+    fname = case.split("_")[0] + "_" + case.split("_")[1]
+else:
+    fname = case
+ncfile = os.path.join(input_folder, f"Amitis_{fname}_115000.nc")
 
-input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/all_xz/"
-ncfile = os.path.join(input_folder, f"Amitis_{case}_115000_xz_comp.nc")
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}/"
 os.makedirs(output_folder, exist_ok=True)
 
 plot_lines = True  # True to plot field lines
 RM = 2440.0  # Mercury radius [km]
-dx = 75.0  # grid spacing
+dx = 200.0  # grid spacing
 trace_length = 20 * RM
 surface_tol = dx
 
@@ -45,9 +49,15 @@ x = ds["Nx"].values
 y = ds["Ny"].values
 z = ds["Nz"].values
 
-Bx = np.transpose(ds["Bx_tot"].isel(time=0).values, (2, 1, 0))  # Nx,Ny,Nz
-By = np.transpose(ds["By_tot"].isel(time=0).values, (2, 1, 0))
-Bz = np.transpose(ds["Bz_tot"].isel(time=0).values, (2, 1, 0))
+# Extract fields (drop time dimension)
+Bx = (ds["Bx"].isel(time=0).values + ds["Bdx"].isel(time=0).values)
+By = (ds["By"].isel(time=0).values + ds["Bdy"].isel(time=0).values)
+Bz = (ds["Bz"].isel(time=0).values + ds["Bdz"].isel(time=0).values)
+
+#  Transpose: Nz, Ny, Nx --> Nx, Ny, Nz
+Bx_plane = np.transpose(Bx, (2, 1, 0))
+By_plane = np.transpose(By, (2, 1, 0))
+Bz_plane = np.transpose(Bz, (2, 1, 0))
 
 xmin, xmax = x.min(), x.max()
 ymin, ymax = y.min(), y.max()
@@ -93,8 +103,8 @@ footprints_class = []
 lines_by_topo = {"closed": [], "open": [], "solar_wind": []}
 
 for seed in seeds:
-    traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=h_step)
-    traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx, By, Bz, x, y, z, RM, max_steps=max_steps, h=-h_step)
+    traj_fwd, exit_fwd_y = trace_field_line_rk(seed, Bx_plane, By_plane, Bz_plane, x, y, z, RM, max_steps=max_steps, h=h_step)
+    traj_bwd, exit_bwd_y = trace_field_line_rk(seed, Bx_plane, By_plane, Bz_plane, x, y, z, RM, max_steps=max_steps, h=-h_step)
     topo = classify(traj_fwd, traj_bwd, RM, exit_fwd_y, exit_bwd_y)
     if topo not in ["TBD"]:
         lines_by_topo[topo].append(traj_fwd[:, [0, 2]])
@@ -112,10 +122,6 @@ df_planet = pd.DataFrame({
     "longitude_deg": [lon for lat, lon in footprints],
     "classification": footprints_class
 })
-
-csv_file = os.path.join(output_folder, f"Amitis_{case}_115000_xz_comp_footprints.csv")
-df_planet.to_csv(csv_file, index=False)
-print(f"Saved {len(df_planet)} footprints to {csv_file}")
 
 # ======================
 # PLOT FIELD LINES (X-Z PLANE)
@@ -135,14 +141,14 @@ if plot_lines:
             ax.add_collection(lc)
 
     # Legend
-    legend_handles = [mlines.Line2D([], [], color=c, label=k) for k, c in colors.items() if k in ["closed", "open"]]
+    legend_handles = [mlines.Line2D([], [], color=c, label=k) for k, c in colors.items() if k in ["closed", "open", "solar_wind"]]
     ax.legend(handles=legend_handles, loc="upper right")
 
     ax.set_xlabel("X [km]")
     ax.set_ylabel("Z [km]")
     ax.set_aspect("equal")
     ax.set_title(f"{case.replace("_", " ")} Magnetic Field-Line Topology (X-Z Plane)")
-    ax.set_xlim(-6 * RM, 4.5 * RM)
+    ax.set_xlim(-10 * RM, 4.5 * RM)
     ax.set_ylim(-4.5 * RM, 4.5 * RM)
     plt.tight_layout()
     output_topo = os.path.join(output_folder, "2D_topology/")
