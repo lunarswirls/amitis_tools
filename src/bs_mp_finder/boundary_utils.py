@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Imports:
+import os
 import numpy as np
 import xarray as xr
 from src.bs_mp_finder.boundary_thresholds import THRESHOLDS as th
@@ -82,7 +83,7 @@ def extract_slice_fields(ds: xr.Dataset, use_slice: str):
     return BX,BY,BZ,vx01,vy01,vz01,vx03,vy03,vz03,den01,den03,JX,JY,JZ
 
 
-def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, debug: bool=True):
+def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, case: str, sim_step: float, debug: bool=False):
     """
     Compute Bmag and BS/MP masks for one timestep.
     Units of Nx, Ny, Nz are km
@@ -101,12 +102,12 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
     BX,BY,BZ,vx01,vy01,vz01,vx03,vy03,vz03,den01,den03,JX,JY,JZ = extract_slice_fields(ds, use_slice)
 
     tot_den = den01 + den03  # units: cm^-3
-    Pmag = (tot_den * 1e15).assign_attrs(units="km^-3", converted_from="cm^-3", conversion_factor="1e15")  # units: km^-3
+    Pmag = (tot_den) # * 1e15).assign_attrs(units="km^-3", converted_from="cm^-3", conversion_factor="1e15")  # units: km^-3
     Bmag = np.sqrt(BX**2 + BY**2 + BZ**2)  # units: nT
     Vmag01 = np.sqrt(vx01**2 + vy01**2 + vz01**2)  # units: km/s
     Vmag03 = np.sqrt(vx03**2 + vy03**2 + vz03**2)  # units: km/s
     Vmag = Vmag01 + Vmag03  # units: km/s
-    Jmag = (np.sqrt(JX**2 + JY**2 + JZ**2) * 1e6).assign_attrs(units="nA/km^2", converted_from="nA/m^2", conversion_factor="1e6")   # units: nA/km^2
+    Jmag = (np.sqrt(JX**2 + JY**2 + JZ**2)) # * 1e6).assign_attrs(units="nA/km^2", converted_from="nA/m^2", conversion_factor="1e6")   # units: nA/km^2
 
     B = xr.concat([BX, BY, BZ], dim="comp").assign_coords(comp=["x", "y", "z"])
     Bhat = B / Bmag
@@ -118,12 +119,14 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
         dB_du    = Bmag.differentiate("Nx")
         dV_du    = Vmag.differentiate("Nx")
         dJ_du    = Jmag.differentiate("Nx")
+        dJy_du   = JY.differentiate("Nx")
         dP_du    = Pmag.differentiate("Nx")
         dBhat_du = Bhat.differentiate("Nx")
 
         dB_dv    = Bmag.differentiate("Ny")
         dV_dv    = Vmag.differentiate("Ny")
         dJ_dv    = Jmag.differentiate("Ny")
+        dJy_dv = JY.differentiate("Ny")
         dP_dv    = Pmag.differentiate("Ny")
         dBhat_dv = Bhat.differentiate("Ny")
 
@@ -131,12 +134,14 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
         dB_du    = Bmag.differentiate("Nx")
         dV_du    = Vmag.differentiate("Nx")
         dJ_du    = Jmag.differentiate("Nx")
+        dJy_du = JY.differentiate("Nx")
         dP_du    = Pmag.differentiate("Nx")
         dBhat_du = Bhat.differentiate("Nx")
 
         dB_dv    = Bmag.differentiate("Nz")
         dV_dv    = Vmag.differentiate("Nz")
         dJ_dv    = Jmag.differentiate("Nz")
+        dJy_dv = JY.differentiate("Nz")
         dP_dv    = Pmag.differentiate("Nz")
         dBhat_dv = Bhat.differentiate("Nz")
 
@@ -144,12 +149,14 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
         dB_du    = Bmag.differentiate("Ny")
         dV_du    = Vmag.differentiate("Ny")
         dJ_du    = Jmag.differentiate("Ny")
+        dJy_du = JY.differentiate("Ny")
         dP_du    = Pmag.differentiate("Ny")
         dBhat_du = Bhat.differentiate("Ny")
 
         dB_dv    = Bmag.differentiate("Nz")
         dV_dv    = Vmag.differentiate("Nz")
         dJ_dv    = Jmag.differentiate("Nz")
+        dJy_dv = JY.differentiate("Nz")
         dP_dv    = Pmag.differentiate("Nz")
         dBhat_dv = Bhat.differentiate("Nz")
     else:
@@ -159,37 +166,57 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
     gradV = np.sqrt(dV_du**2 + dV_dv**2)
     gradP = np.sqrt(dP_du**2 + dP_dv**2)
     gradJ = np.sqrt(dJ_du**2 + dJ_dv**2)
+    gradJy = np.sqrt(dJy_du**2 + dJy_dv**2)
 
-    fig1, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(8, 6), constrained_layout=True)
+    # nan out anything inside of mercury
+    y_axis = x_plot  # coords_for_slice returns (Y, Z) for yz
+    z_axis = y_plot
+    Yg, Zg = np.meshgrid(y_axis, z_axis, indexing="xy")
+    r = np.sqrt(Yg ** 2 + Zg ** 2)
 
-    last_im = ax1.pcolormesh(x_plot, y_plot, gradB, shading="auto", cmap="cividis", vmin=0, vmax=1)
-    cbar = fig1.colorbar(last_im, ax=ax1, location="right", shrink=0.9)
-    cbar.set_label(r"nT/km")
-    ax1.set_title(r"$\nabla$|B|")
+    # Exclude inside the planetary body
+    outside_body = r >= 1.0
 
-    last_im = ax2.pcolormesh(x_plot, y_plot, gradV, shading="auto", cmap="plasma", vmin=0, vmax=5)
-    cbar = fig1.colorbar(last_im, ax=ax2, location="right", shrink=0.9)
-    cbar.set_label(r"1/s")
-    ax2.set_title(r"$\nabla$|V|")
+    gradB = gradB.where(outside_body)
+    gradV = gradV.where(outside_body)
+    gradP = gradP.where(outside_body)
+    gradJ = gradJ.where(outside_body)
+    gradJy = gradJy.where(outside_body)
 
-    last_im = ax3.pcolormesh(x_plot, y_plot, gradP, shading="auto", cmap="cool", vmin=0, vmax=100000)
-    cbar = fig1.colorbar(last_im, ax=ax3, location="right", shrink=0.9)
-    cbar.set_label(r"km$^{-4}$")
-    ax3.set_title(r"$\nabla$|N|")
+    if debug:
+        fig1, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(8, 6), constrained_layout=True)
 
-    last_im = ax4.pcolormesh(x_plot, y_plot, gradJ, shading="auto", cmap="viridis", vmin=0, vmax=10000)
-    cbar = fig1.colorbar(last_im, ax=ax4, location="right", shrink=0.9)
-    cbar.set_label(r"nA/km$^3$")
-    ax4.set_title(r"$\nabla$|J|")
+        last_im = ax1.pcolormesh(x_plot, y_plot, gradB, shading="auto", cmap="cividis", vmin=0, vmax=0.5)
+        cbar = fig1.colorbar(last_im, ax=ax1, location="right", shrink=0.9)
+        cbar.set_label(r"nT/km")
+        ax1.set_title(r"$\nabla$|B|")
 
-    for ax in [ax1, ax2, ax3, ax4]:
-        ax.set_xlim([-5, 5])
-        ax.set_ylim([-5, 5])
-        ax.set_aspect("equal")
+        last_im = ax2.pcolormesh(x_plot, y_plot, gradV, shading="auto", cmap="plasma", vmin=0, vmax=1)
+        cbar = fig1.colorbar(last_im, ax=ax2, location="right", shrink=0.9)
+        cbar.set_label(r"1/s")
+        ax2.set_title(r"$\nabla$|V|")
 
-    fig1.suptitle(r"CPS Base")
-    fig1.show()
-    fig1.savefig("/Users/danywaller/Projects/mercury/extreme/slice_bowshock/CPS_Base_gradients.png", dpi=300)
+        last_im = ax3.pcolormesh(x_plot, y_plot, gradP, shading="auto", cmap="cool", vmin=0, vmax=1)
+        cbar = fig1.colorbar(last_im, ax=ax3, location="right", shrink=0.9)
+        cbar.set_label(r"cm$^{-3}$/km")
+        ax3.set_title(r"$\nabla$|N|")
+
+        last_im = ax4.pcolormesh(x_plot, y_plot, gradJy, shading="auto", cmap="viridis", vmin=0, vmax=1)
+        cbar = fig1.colorbar(last_im, ax=ax4, location="right", shrink=0.9)
+        cbar.set_label(r"(nA/m$^2$)/km")
+        ax4.set_title(r"$\nabla$|J$_y$|")
+
+        for ax in [ax1, ax2, ax3, ax4]:
+            ax.set_xlim([-5, 5])
+            ax.set_ylim([-5, 5])
+            ax.set_aspect("equal")
+
+        fig1.suptitle(f"{case.replace("_", " ")} {use_slice.upper()} t={sim_step*0.002} s", y=0.99)
+        # fig1.show()
+        outdir = f"/Users/danywaller/Projects/mercury/extreme/slice_bowshock/{case}/gradients/"
+        os.makedirs(outdir, exist_ok=True)
+        fig1.savefig(os.path.join(outdir, f"{case}_gradients_{use_slice.upper()}_{sim_step:06d}.png"), dpi=300)
+        plt.close(fig1)
 
     rotation_strength = (dBhat_du**2 + dBhat_dv**2).sum("comp") ** 0.5
 
@@ -199,11 +226,11 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
     den_threshold_bs  = th["Pgradmax_bs"] * np.nanmax(gradP)
 
     bmag_threshold_mp = th["Bgradmax_mp"] * np.nanmax(gradB)
-    # vmag_threshold_mp = th["Vgradmax_mp"] * np.nanmax(gradV)
-    jmag_threshold_mp = th["Jgradmax_mp"] * np.nanmax(gradJ)
+    vmag_threshold_mp = th["Vgradmax_mp"] * np.nanmax(gradV)
+    jmag_threshold_mp = th["Jgradmax_mp"] * np.nanmax(gradJy)
     den_threshold_mp = th["Pgradmax_mp"] * np.nanmax(gradP)
 
-    rot_threshold_mp = th["rotmax_mp"] * np.nanmax(rotation_strength)
+    # rot_threshold_mp = th["rotmax_mp"] * np.nanmax(rotation_strength)
 
     s = use_slice.lower().strip()
 
@@ -225,12 +252,13 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
 
         bowshock_mask = (
                 (gradV > vmag_threshold_bs) & (dV_du > 0) &
-                (gradJ > jmag_threshold_bs) &
-                (gradP > den_threshold_bs) & (dP_du < 0)
+                (gradJ > jmag_threshold_bs) & (dJ_du < 0) &
+                (gradP > den_threshold_bs) & (dP_du < 0) # &
+                # (gradB > bmag_threshold_bs) & (dB_du < 0)
         )
 
         magnetopause_mask = (
-                (gradJ > jmag_threshold_mp) & (dJ_du > 0) &
+                (gradJy > jmag_threshold_mp) & (dJy_du > 0) &
                 (gradP > den_threshold_mp) & (dP_du > 0) &
                 (gradB > bmag_threshold_mp) & (dB_du < 0)
         )
@@ -265,7 +293,7 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
 
         # Rotation field as numpy for fast masking
         gradB = gradB.values
-        gradJ = gradJ.values
+        gradJy = gradJy.values
         gradP = gradP.values
         rot = rotation_strength.values
 
@@ -273,7 +301,7 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
         # Unified candidate gate on strong |J| and density gradients
         # ------------------------------------------------------------
         candidate = (
-                (gradJ > jmag_threshold_bs) &
+                (gradJy > jmag_threshold_bs) &
                 (gradP > den_threshold_bs) &
                 outside_body &
                 np.isfinite(rot)
@@ -289,7 +317,7 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
                 return int(np.count_nonzero(mask))
 
             print(
-                f"max gradJ={np.nanmax(gradJ):.3g} thr={jmag_threshold_bs:.3g} "
+                f"max gradJ={np.nanmax(gradJy):.3g} thr={jmag_threshold_bs:.3g} "
                 f"max gradP={np.nanmax(gradP):.3g} thr={den_threshold_bs:.3g} "
                 f"max gradB={np.nanmax(gradB):.3g} thr={bmag_threshold_bs:.3g} "
                 f"max rot={np.nanmax(rotation_strength):.3g} thr={rot_threshold_mp:.3g} "
@@ -350,8 +378,8 @@ def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, deb
 
     plot_bg = bg_map[plot_id].values
 
-    if plot_id == "Pmag":
-        plot_bg = plot_bg * 1e-6  # convert back to cm^-3
+    # if plot_id == "Pmag":
+        # plot_bg = plot_bg * 1e-6  # convert back to cm^-3
 
     return x_plot, y_plot, plot_bg, bowshock_mask, magnetopause_mask
 
@@ -386,26 +414,36 @@ def occupancy_and_bands(stack_bool: np.ndarray, thresholds=(0.25, 0.125, 0.0625)
     return p, q1mask, medmask, q3mask
 
 
-def max_axis_distance(mask, x, y, width_km=100):
+def max_axis_distance(mask, x, y, width_km=500):
     """
-    From a median contour mask, find the point within +/- width_km
-    of axis=0 with maximum radial distance.
-    Returns (x, axis, r) as Python floats.
+    Take the median X value of contour points within +/- width_km
+    of the axis. Returns (x_med, axis_med, r) as Python floats.
     """
     pts = np.argwhere(mask)
 
-    best = None
-    best_r = -np.inf
+    if pts.size == 0:
+        return None
+
+    width_re = width_km / 2440.0  # km → R_M
+
+    x_vals = []
+    a_vals = []
 
     for iy, ix in pts:
-        xv = float(x[ix])
         av = float(y[iy])   # Y (XY) or Z (XZ)
 
-        if abs(av) <= (width_km / 2440.0):
-            r = float(np.hypot(xv, av))  # guaranteed scalar
+        if abs(av) > width_re:
+            continue
 
-            if r > best_r:
-                best_r = r
-                best = (xv, av, r)
+        xv = float(x[ix])
+        x_vals.append(xv)
+        a_vals.append(av)
 
-    return best
+    if len(x_vals) == 0:
+        return None
+
+    x_med = float(np.median(x_vals))
+    a_med = float(np.median(a_vals))
+    r = float(np.hypot(x_med, a_med))
+
+    return x_med, a_med, r

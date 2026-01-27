@@ -14,7 +14,7 @@ debug = False
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPS_Base"
+case = "CPN_Base"
 
 if "Base" in case:
     base_dir = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/"
@@ -62,7 +62,7 @@ PLOT_BG = {
 # take last 15-ish seconds
 sim_steps = list(range(98000, 115000 + 1, 1000))
 
-out_dir = f"/Users/danywaller/Projects/mercury/extreme/slice_bowshock/{case}/"
+out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_id_timeseries/{case}/"
 os.makedirs(out_dir, exist_ok=True)
 
 out_folder_ts = os.path.join(out_dir, f"timeseries_{slice_tag}/")
@@ -102,7 +102,7 @@ for sim_step in sim_steps:
             continue
 
         ds = xr.open_dataset(f)
-        x_plot, y_plot, plot_bg, bs_mask, mp_mask = compute_masks_one_timestep(ds, use_slice, plot_id)
+        x_plot, y_plot, plot_bg, bs_mask, mp_mask = compute_masks_one_timestep(ds, use_slice, plot_id, case, sim_step)
         ds.close()
 
         if bs_mask.size != 0 and mp_mask.size != 0:
