@@ -4,14 +4,31 @@ from pathlib import Path
 import os
 import numpy as np
 
-case = "RPS_Base"
+# base cases: CPN_Base RPN_Base CPS_Base RPS_Base
+# HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
+case = "CPN_HNHV"
+post_icme = False
 
-folder = Path(f"/Volumes/data_backup/mercury/extreme/{case}/05/subset/")
-outdir = f"/Volumes/data_backup/mercury/extreme/{case}/05/particles/"
+if "Base" in case:
+    folder = Path(f"/Volumes/data_backup/mercury/extreme/{case}/05/subset/")
+    outdir = f"/Volumes/data_backup/mercury/extreme/{case}/05/particles/"
+elif "HNHV" in case:
+    if post_icme:
+        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/subset/")
+        outdir = f"/Volumes/data_backup/mercury/extreme/{case}/10/particles/"
+    else:
+        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/subset/")
+        outdir = f"/Volumes/data_backup/mercury/extreme/{case}/10/particles/"
 os.makedirs(outdir, exist_ok=True)
 
-sim_steps = range(100000, 115000 + 1, 1000)
-# sim_steps = range(114000, 115000 + 1, 1000)
+# take last 15-ish seconds
+if "Base" in case:
+    sim_steps = list(range(100000, 115000 + 1, 1000))
+elif "HNHV" in case:
+    if post_icme:
+        sim_steps = range(165000, 197000 + 1, 1000)  # post-sheath
+    else:
+        sim_steps = range(140000, 150000 + 1, 1000)  # sheath
 
 # Initialize cached coordinates
 x = y = z = None
