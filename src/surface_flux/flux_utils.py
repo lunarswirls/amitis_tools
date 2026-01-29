@@ -112,6 +112,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
         if len(r) == 0:
             empty = np.zeros((n_lat, n_lon))
+            print("\n")
             return empty, empty, empty, empty
 
         # Radial unit vector and radial velocity [m/s]
@@ -233,6 +234,8 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
             weights=weights  # [# particles]
         )
 
+        macro_hits = count_map / w_species
+
         vr_map = np.zeros((n_lat, n_lon))
         n_floor = 1e10  # [# particles] minimum for reliable statistics
         valid_bins = n_hist > n_floor
@@ -244,7 +247,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
         flx_map = vr_map * 1e3 * n_shell_map  # [m^-2 s^-1]
 
-        return flx_map, vr_map, count_map, n_shell_map  # [m^-2 s^-1, km/s, #, m^-3]
+        return flx_map, vr_map, macro_hits, n_shell_map  # [m^-2 s^-1, km/s, #, m^-3]
 
     # ========== Main logic: sum over species ==========
     if species == "all":
@@ -270,7 +273,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
 
     else:
-        spec_id = 0 if species == "protons" else 1
+        spec_id = 0 if species == "protons" else 2
         flux_map, v_r_map, count_map, n_shell_map = process_species(spec_id)
 
     # Convert flux to [cm^-2 s^-1]
