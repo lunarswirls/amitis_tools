@@ -380,6 +380,6 @@ def plot_moments_at_surface(specie_id):
 
 
 if __name__ == '__main__':
-    combine_all_files()
+    # combine_all_files()
     calc_moments_at_surface(0)
     plot_moments_at_surface(0)

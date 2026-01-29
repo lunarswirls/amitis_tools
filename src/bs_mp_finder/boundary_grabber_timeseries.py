@@ -67,7 +67,7 @@ elif "HNHV" in case:
     if post_icme:
         sim_steps = range(165000, 197000 + 1, 1000)  # sheath
     else:
-        sim_steps = range(127000, 153000 + 1, 1000)  # shock
+        sim_steps = range(137000, 153000 + 1, 1000)  # post-sheath
 
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_id_timeseries/{case}/"
 os.makedirs(out_dir, exist_ok=True)
@@ -143,7 +143,14 @@ for sim_step in sim_steps:
     tsec = sim_step * 0.002
     fig.suptitle(f"{case.replace("_", " ")} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) position at t = {tsec:.3f} s", fontsize=18, y=0.99)
 
-    outpath = os.path.join(out_folder_ts, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
+    if "Base" in case:
+        outpath = os.path.join(out_folder_ts, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
+    elif "HNHV" in case:
+        if post_icme:
+            outpath = os.path.join(out_folder_ts, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}_post-sheath.png")
+        else:
+            outpath = os.path.join(out_folder_ts, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}_sheath.png")
+
     fig.savefig(outpath, dpi=300)
     plt.close(fig)
 
@@ -269,12 +276,29 @@ if last_im is not None:
     cbar = fig.colorbar(last_im, ax=axes, location="right", shrink=0.75)
     cbar.set_label(rf"$\mathrm{{Median}}\ {cfg['label']}$")
 
-if n_slices > 2:
-    fig.suptitle(f"{case.replace("_", " ")} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=18, y=0.99)
-else:
-    fig.suptitle(f"{case.replace("_", " ")} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) IQR envelopes with median occupancy contour", fontsize=14, y=0.99)
+stitle = f"{case.replace("_", " ")} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) Median/IQR"
 
-median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median.png")
+if "Base" in case:
+    stitle = stitle + ": Pre-Transient"
+elif "HNHV" in case:
+    if post_icme:
+        stitle = stitle + ": Post-Transient"
+    else:
+        stitle = stitle + ": Transient"
+
+if n_slices > 2:
+    fig.suptitle(stitle, fontsize=18, y=0.99)
+else:
+    fig.suptitle(stitle, fontsize=14, y=0.99)
+
+if "Base" in case:
+    median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median.png")
+elif "HNHV" in case:
+    if post_icme:
+        median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median_post-sheath.png")
+    else:
+        median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median_sheath.png")
+
 fig.savefig(median_path, dpi=300)
 plt.close(fig)
 
@@ -320,10 +344,13 @@ for boundary, key in [("BowShock", "bs"), ("Magnetopause", "mp")]:
 # ----------------------------
 df = pd.DataFrame(records)
 
-csv_path = os.path.join(
-    out_dir,
-    f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}.csv"
-)
+if "Base" in case:
+    csv_path = os.path.join(out_dir,f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}.csv")
+elif "HNHV" in case:
+    if post_icme:
+        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}_post-sheath.csv")
+    else:
+        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}_sheath.csv")
 
 df.to_csv(csv_path, index=False)
 print(f"Saved median boundary distances: {csv_path}")
