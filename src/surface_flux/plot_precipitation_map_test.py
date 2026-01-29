@@ -75,24 +75,24 @@ log_flx_norm  = safe_log10((vr_abs*den)/sim_flx_tot)
 
 # Define fields for plotting
 fields_raw = [
-    (cnts, (np.nanmin(cnts),    np.nanmax(cnts)),    "viridis", "# particles"),
-    (den_cm3, (np.nanmin(den_cm3), np.nanmax(den_cm3)), "cividis", r"$n$ [cm$^{-3}$]"),
-    (vr_abs, (np.nanmin(vr_abs), np.nanmax(vr_abs)), "plasma",  r"$|v_r|$ [km s$^{-1}$]"),
-    (flux,  (np.nanmin(flux),   np.nanmax(flux)),   "jet",     r"$F_r$ [cm$^{-2}$ s$^{-1}$]")
+    (cnts, (np.nanmin(cnts),    np.nanmax(cnts)),    "PuBu", "# particles"),
+    (den_cm3, (np.nanmin(den_cm3), np.nanmax(den_cm3)), "YlGn", r"$n$ [cm$^{-3}$]"),
+    (vr_abs, (np.nanmin(vr_abs), np.nanmax(vr_abs)), "YlOrBr",  r"$|v_r|$ [km s$^{-1}$]"),
+    (flux,  (np.nanmin(flux),   np.nanmax(flux)),   "BuPu",     r"$F_r$ [cm$^{-2}$ s$^{-1}$]")
 ]
 
 fields_log = [
-    (log_cnts, (np.nanmin(log_cnts),    np.nanmax(log_cnts)),    "viridis", "log10(# particles)"),
-    (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "cividis", r"log10($n$) [cm$^{-3}$]"),
-    (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "plasma",  r"log10($|v_r|$) [km s$^{-1}$]"),
-    (log_flx,  (np.nanmin(log_flx),   np.nanmax(log_flx)),   "jet",     r"log10($F_r$) [cm$^{-2}$ s$^{-1}$]")
+    (log_cnts, (np.nanmin(log_cnts),    np.nanmax(log_cnts)),    "PuBu", "log10(# particles)"),
+    (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "YlGn", r"log10($n$) [cm$^{-3}$]"),
+    (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "YlOrBr",  r"log10($|v_r|$) [km s$^{-1}$]"),
+    (log_flx,  (np.nanmin(log_flx),   np.nanmax(log_flx)),   "BuPu",     r"log10($F_r$) [cm$^{-2}$ s$^{-1}$]")
 ]
 
 fields_log_norm = [
-    (log_cnts, (np.nanmin(log_cnts),    np.nanmax(log_cnts)),    "viridis", "log10(# particles)"),
-    (log_den_norm,   (-2, 1), "cividis", r"log10($n/n_0$)"),
-    (log_vel_norm, (-1, 1), "plasma",  r"log10($|v_r|/v_0$)"),
-    (log_flx_norm,  (-2, 1),   "jet",     r"log10($F_r /F_0$)")
+    (log_cnts, (np.nanmin(log_cnts),    np.nanmax(log_cnts)),    "PuBu", "log10(# particles)"),
+    (log_den_norm,   (-2, 1), "YlGn", r"log10($n/n_0$)"),
+    (log_vel_norm, (-1, 1), "YlOrBr",  r"log10($|v_r|/v_0$)"),
+    (log_flx_norm,  (-2, 1),   "BuPu",     r"log10($F_r /F_0$)")
 ]
 
 titles = ["Counts", "Density", "Radial velocity", "Flux"]

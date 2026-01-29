@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import src.surface_flux.flux_utils as flux_utils
 
-case = "CPS_Base"
+case = "CPN_Base"
 main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 
@@ -23,12 +23,12 @@ sim_dy = 75.e3  # simulation cell size based on Amitis.inp
 sim_dz = 75.e3  # simulation cell size based on Amitis.inp
 sim_robs = 2440.e3  # obstacle radius based on Amitis.inp
 
-nlat = 90
-nlon = 180
+nlat = 180
+nlon = 360
 
 select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection
 
-if "CP" in case:
+if "CPZ" in case:
     input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_largerxdomain_smallergridsize/"
     csv_file = os.path.join(input_folder2, f"{case}_largerxdomain_smallergridsize_115000_ocb_curve.csv")  # single timestep CSV with OCB curve
 
@@ -106,24 +106,24 @@ log_flx_norm = safe_log10(flux_abs / sim_flux_upstream)    # [cm^-2 s^-1] / [cm^
 
 # Define fields for plotting
 fields_raw = [
-    (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles"),
-    (den_cm3, (np.nanmin(den_cm3), np.nanmax(den_cm3)), "cividis", r"$n$ [cm$^{-3}$]"),
-    (vr_abs, (np.nanmin(vr_abs), np.nanmax(vr_abs)), "plasma", r"$|v_r|$ [km s$^{-1}$]"),
-    (flux_abs, (np.nanmin(flux_abs), np.nanmax(flux_abs)), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]")
+    (cnts, (1, 200), "viridis", "# particles", "magenta"),
+    (den_cm3, (1, 140), "cividis", r"$n$ [cm$^{-3}$]", "magenta"),
+    (vr_abs, (1, 250), "plasma", r"$|v_r|$ [km/s]", "magenta"),
+    (flux_abs, (0.05e9, 8.5e8), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]", "magenta")
 ]
 
 fields_log = [
-    (log_cnts, (np.nanmin(log_cnts), np.nanmax(log_cnts)), "viridis", r"log$_{10}$(# particles)"),
-    (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "cividis", r"log$_{10}$($n$) [cm$^{-3}$]"),
-    (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "plasma", r"log$_{10}$($|v_r|$) [km s$^{-1}$]"),
-    (log_flx, (np.nanmin(log_flx), np.nanmax(log_flx)), "jet", r"log$_{10}$($F_r$) [cm$^{-2}$ s$^{-1}$]")
+    (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles", "magenta"),
+    (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "cividis", r"log$_{10}$($n$) [cm$^{-3}$]", "magenta"),
+    (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "plasma", r"log$_{10}$($|v_r|$) [km s$^{-1}$]", "magenta"),
+    (log_flx, (np.nanmin(log_flx), np.nanmax(log_flx)), "jet", r"log$_{10}$($F_r$) [cm$^{-2}$ s$^{-1}$]", "magenta")
 ]
 
 fields_log_norm = [
-    (log_cnts, (np.nanmin(log_cnts), np.nanmax(log_cnts)), "viridis", r"log$_{10}$(# particles)"),
-    (log_den_norm, (-2, 1), "cividis", r"log$_{10}$($n/n_0$)"),
-    (log_vel_norm, (-1, 1), "plasma", r"log$_{10}$($|v_r|/v_0$)"),
-    (log_flx_norm, (-2, 1), "jet", r"log$_{10}$($F_r/F_0$)")
+    (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles", "magenta"),
+    (log_den_norm, (-1, 1), "cividis", r"log$_{10}$($n/n_0$)", "magenta"),
+    (log_vel_norm, (-1.0, 0.0), "plasma", r"log$_{10}$($|v_r|/v_0$)", "magenta"),
+    (log_flx_norm, (-2, 1), "jet", r"log$_{10}$($F_r/F_0$)", "magenta")
 ]
 
 if plot_meth == 'raw':
@@ -135,7 +135,7 @@ elif plot_meth == 'lognorm':
 
 titles = ["Counts", "Density", "Radial velocity", "Flux"]
 
-if "CP" in case:
+if "CPZ" in case:
     # Split north and south hemispheres
     df_north = df_footprints[df_footprints["hemisphere"] == "north"]
     df_south = df_footprints[df_footprints["hemisphere"] == "south"]
@@ -157,7 +157,7 @@ fig, axes = plt.subplots(
 fig.patch.set_facecolor("white")
 axes = axes.flatten()
 
-for ax, (data, clim, cmap, cblabel), title in zip(axes, use_fields, titles):
+for ax, (data, clim, cmap, cblabel, ocb_col), title in zip(axes, use_fields, titles):
     ax.set_facecolor("white")
     ax.grid(True, linestyle="dotted", color="gray")
 
@@ -171,10 +171,10 @@ for ax, (data, clim, cmap, cblabel), title in zip(axes, use_fields, titles):
     )
     pcm.set_clim(*clim)
 
-    if "CP" in case:
+    if "CPZ" in case:
         # Plot
-        ax.plot(lon_n_rad, lat_n_rad, color="magenta", lw=2, label="OCB North")
-        ax.plot(lon_s_rad, lat_s_rad, color="magenta", lw=2, ls="--", label="OCB South")
+        ax.plot(lon_n_rad, lat_n_rad, color=ocb_col, lw=2, label="OCB North")
+        ax.plot(lon_s_rad, lat_s_rad, color=ocb_col, lw=2, ls="--", label="OCB South")
 
     cbar = plt.colorbar(
         pcm,
@@ -215,7 +215,7 @@ elif run_species == "alphas":
     stitle = f"{case.replace('_', ' ')}: He++"
     plot_fname = f"{case}_surface_flux_He++_{plot_meth}vals"
 
-if "CP" in case:
+if "CPZ" in case:
     stitle = stitle + "\nOCB footprints"
     plot_fname = plot_fname + "_footprints.png"
 else:
