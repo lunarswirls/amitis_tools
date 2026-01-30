@@ -6,7 +6,7 @@ import numpy as np
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_HNHV"
+case = "RPN_HNHV"
 post_icme = False
 
 if "Base" in case:
@@ -15,10 +15,10 @@ if "Base" in case:
 elif "HNHV" in case:
     if post_icme:
         folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/subset/")
-        outdir = f"/Volumes/data_backup/mercury/extreme/{case}/10/particles/"
+        outdir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/particles/"
     else:
-        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/subset/")
-        outdir = f"/Volumes/data_backup/mercury/extreme/{case}/10/particles/"
+        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/subset/")
+        outdir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/particles/"
 os.makedirs(outdir, exist_ok=True)
 
 # take last 15-ish seconds
