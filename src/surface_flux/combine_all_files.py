@@ -6,8 +6,18 @@ import numpy as np
 from pathlib import Path
 from pyamitis.amitis_particle import *
 
-case = "RPS_Base"
-main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
+# base cases: CPN_Base RPN_Base CPS_Base RPS_Base
+# HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
+case = "CPN_HNHV"
+post_icme = False
+
+if "Base" in case:
+    main_path = f"/Volumes/data_backup/mercury/extreme/{case}/05/"
+elif "HNHV" in case:
+    if post_icme:
+        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
+    else:
+        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/"
 
 select_R = 2480.e3
 
