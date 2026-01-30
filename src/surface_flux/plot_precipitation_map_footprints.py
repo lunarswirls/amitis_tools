@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import src.surface_flux.flux_utils as flux_utils
+import src.helper_utils as helper_utils
 
 case = "CPN_Base"
 main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
@@ -12,6 +13,7 @@ output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 
 plot_meth = "raw"  # raw, log, lognorm
 run_species = "all"  # 'all' or 'protons' or 'alphas'
+plot_footprints = False
 
 species = np.array(['H+', 'tbd', 'He++', 'tbd2'])  # The order is important and it should be based on Amitis.inp file
 sim_ppc = [24, 0, 11, 0]  # Number of particles per species, based on Amitis.inp
@@ -28,7 +30,7 @@ nlon = 360
 
 select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection
 
-if "CPZ" in case:
+if plot_footprints and "CP" in case:
     input_folder2 = f"/Users/danywaller/Projects/mercury/extreme/bfield_topology/{case}_largerxdomain_smallergridsize/"
     csv_file = os.path.join(input_folder2, f"{case}_largerxdomain_smallergridsize_115000_ocb_curve.csv")  # single timestep CSV with OCB curve
 
@@ -76,18 +78,11 @@ flux_abs[mask] = np.nan
 # ========== Unit conversions ==========
 den_cm3 = den * 1e-6  # [m^-3] → [cm^-3]
 
-def safe_log10(arr, vmin=1e-30):
-    """Safe log10 that handles zeros/negatives."""
-    out = np.full_like(arr, np.nan, dtype=float)
-    mask = arr > vmin
-    out[mask] = np.log10(arr[mask])
-    return out
-
 # ========== Logarithmic maps ==========
-log_cnts = safe_log10(cnts)
-log_den  = safe_log10(den_cm3)  # log10(cm^-3)
-log_vel  = safe_log10(vr_abs)   # log10(km/s)
-log_flx  = safe_log10(flux_abs) # log10(cm^-2 s^-1)
+log_cnts = helper_utils.safe_log10(cnts)
+log_den  = helper_utils.safe_log10(den_cm3)  # log10(cm^-3)
+log_vel  = helper_utils.safe_log10(vr_abs)   # log10(km/s)
+log_flx  = helper_utils.safe_log10(flux_abs) # log10(cm^-2 s^-1)
 
 # ========== Normalized maps ==========
 # Total upstream density [m^-3]
@@ -100,9 +95,9 @@ sim_vel_tot = np.mean(sim_vel) * 1e-3  # [m/s] → [km/s]
 sim_flux_upstream = sim_den_tot * np.mean(sim_vel) * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
 
 # Normalized quantities
-log_den_norm = safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
-log_vel_norm = safe_log10(vr_abs / sim_vel_tot)            # [km/s] / [km/s]
-log_flx_norm = safe_log10(flux_abs / sim_flux_upstream)    # [cm^-2 s^-1] / [cm^-2 s^-1]
+log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
+log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)            # [km/s] / [km/s]
+log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)    # [cm^-2 s^-1] / [cm^-2 s^-1]
 
 # Define fields for plotting
 fields_raw = [
@@ -135,7 +130,7 @@ elif plot_meth == 'lognorm':
 
 titles = ["Counts", "Density", "Radial velocity", "Flux"]
 
-if "CPZ" in case:
+if plot_footprints and "CP" in case:
     # Split north and south hemispheres
     df_north = df_footprints[df_footprints["hemisphere"] == "north"]
     df_south = df_footprints[df_footprints["hemisphere"] == "south"]
@@ -171,7 +166,7 @@ for ax, (data, clim, cmap, cblabel, ocb_col), title in zip(axes, use_fields, tit
     )
     pcm.set_clim(*clim)
 
-    if "CPZ" in case:
+    if plot_footprints and "CP" in case:
         # Plot
         ax.plot(lon_n_rad, lat_n_rad, color=ocb_col, lw=2, label="OCB North")
         ax.plot(lon_s_rad, lat_s_rad, color=ocb_col, lw=2, ls="--", label="OCB South")
@@ -215,7 +210,7 @@ elif run_species == "alphas":
     stitle = f"{case.replace('_', ' ')}: He++"
     plot_fname = f"{case}_surface_flux_He++_{plot_meth}vals"
 
-if "CPZ" in case:
+if plot_footprints and "CP" in case:
     stitle = stitle + "\nOCB footprints"
     plot_fname = plot_fname + "_footprints.png"
 else:

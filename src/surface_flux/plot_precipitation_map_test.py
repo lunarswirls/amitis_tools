@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pyamitis.amitis_particle import *
 import src.surface_flux.flux_utils as flux_utils
+import src.helper_utils as helper_utils
 
 case = "CPS_Base"
 main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
@@ -55,23 +56,17 @@ flux = flux_cm            # cm^-2 s^-1
 den_cm3 = den * 1e-6      # m^-3 -> cm^-3
 vr_abs  = np.abs(vr)      # km/s -> |km/s|
 
-def safe_log10(arr, vmin=1e-30):
-    out = np.full_like(arr, np.nan, dtype=float)
-    mask = arr > vmin
-    out[mask] = np.log10(arr[mask])
-    return out
-
-log_cnts = safe_log10(cnts)
-log_den  = safe_log10(den_cm3)
-log_vel  = safe_log10(vr_abs)
-log_flx  = safe_log10(vr_abs*den_cm3)
+log_cnts = helper_utils.safe_log10(cnts)
+log_den  = helper_utils.safe_log10(den_cm3)
+log_vel  = helper_utils.safe_log10(vr_abs)
+log_flx  = helper_utils.safe_log10(vr_abs*den_cm3)
 
 sim_den_tot = np.sum(sim_den)
-log_den_norm  = safe_log10(den / sim_den_tot)
+log_den_norm  = helper_utils.safe_log10(den / sim_den_tot)
 sim_vel_tot = np.sum(sim_vel) * 1e-3
-log_vel_norm  = safe_log10(vr_abs / sim_vel_tot)
+log_vel_norm  = helper_utils.safe_log10(vr_abs / sim_vel_tot)
 sim_flx_tot = sim_den_tot * sim_vel_tot
-log_flx_norm  = safe_log10((vr_abs*den)/sim_flx_tot)
+log_flx_norm  = helper_utils.safe_log10((vr_abs*den)/sim_flx_tot)
 
 # Define fields for plotting
 fields_raw = [
