@@ -6,7 +6,7 @@ import numpy as np
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "RPN_HNHV"
+case = "CPS_HNHV"
 post_icme = False
 
 if "Base" in case:

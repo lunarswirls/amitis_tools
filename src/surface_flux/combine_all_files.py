@@ -8,7 +8,7 @@ from pyamitis.amitis_particle import *
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_HNHV"
+case = "RPS_HNHV"
 post_icme = False
 
 if "Base" in case:

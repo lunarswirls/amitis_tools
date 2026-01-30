@@ -5,8 +5,8 @@ import numpy as np
 import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
-plot_meth = "raw"  # raw, log, lognorm
-run_species = "all"  # 'all' or 'protons' or 'alphas'
+plot_meth = "log"  # raw, log, lognorm
+run_species = "protons"  # 'all' or 'protons' or 'alphas'
 
 species = np.array(['H+', 'tbd', 'He++', 'tbd2'])  # The order is important and it should be based on Amitis.inp file
 sim_ppc = [24, 0, 11, 0]  # Number of particles per species, based on Amitis.inp
