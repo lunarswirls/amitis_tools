@@ -9,3 +9,4 @@
 /src/field_topology/__pycache__
 /src/field_topology/.ipynb_checkpoints
 /src/surface_flux/__pycache__
+*.pyc

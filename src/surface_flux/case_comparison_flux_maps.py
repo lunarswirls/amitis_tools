@@ -8,7 +8,10 @@ import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
 # SETTINGS
-cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+# cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+post_icme = False
+
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 os.makedirs(output_folder, exist_ok=True)
 
@@ -16,12 +19,12 @@ debug = False
 footprints = False
 
 plot_meth = "lognorm"  # raw, log, lognorm
-run_species = "protons"  # 'all' or 'protons' or 'alphas'
+run_species = "alphas"  # 'all' or 'protons' or 'alphas'
 
-species = np.array(['H+', 'tbd', 'He++', 'tbd2'])  # The order is important!! should be based on Amitis.inp file
-sim_ppc = [24, 0, 11, 0]  # Number of particles per species, based on Amitis.inp
-sim_den = [38.0e6, 0, 1.0e6, 0]  # [/m^3]
-sim_vel = [400.e3, 0, 400.e3, 0]  # [m/s]
+species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
+sim_ppc = [24, 24, 11, 11]  # Number of particles per species, based on Amitis.inp
+sim_den = [38.0e6, 76.0e6, 1.0e6, 2.0e6]   # [/m^3]
+sim_vel = [400.e3, 700.0e3, 400.e3, 700.0e3]  # [km/s]
 
 sim_dx = 75.e3  # simulation cell size based on Amitis.inp
 sim_dy = 75.e3  # simulation cell size based on Amitis.inp
@@ -37,10 +40,16 @@ select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface f
 fig, axs = plt.subplots(2, 2, figsize=(12, 8), subplot_kw={"projection": "hammer"})
 
 for case in cases:
-    main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
+    if "Base" in case:
+        main_path = f"/Volumes/data_backup/mercury/extreme/{case}/05/"
+    elif "HNHV" in case:
+        if post_icme:
+            main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
+        else:
+            main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/"
 
     all_particles_directory = main_path + 'precipitation/'
-    all_particles_filename = all_particles_directory + "all_particles_at_surface.npz"
+    all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map = \
         flux_utils.compute_radial_flux(
@@ -78,26 +87,31 @@ for case in cases:
     log_flx = helper_utils.safe_log10(flux_abs)
 
     if run_species == "all":
-        # Total upstream density [m^-3]
+        # Total upstream density
         sim_den_tot = np.sum(sim_den)
-
-        # Upstream velocity [km/s]
+        # Upstream velocity
         sim_vel_tot = np.mean(sim_vel) * 1e-3  # [m/s] → [km/s]
-
-        # Upstream flux [cm^-2 s^-1]
+        # Upstream flux
         sim_flux_upstream = sim_den_tot * np.mean(sim_vel) * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-
         log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
     elif run_species == "protons":
-        # Upstream proton flux [cm^-2 s^-1]
-        sim_flux_upstream = sim_den[0] * sim_vel[0] * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-
-        log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+        if "Base" in case:
+            # Upstream proton flux
+            sim_flux_upstream = sim_den[0] * sim_vel[0] * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+        elif "HNHV" in case and not post_icme:
+            # Upstream proton flux
+            sim_flux_upstream = (sim_den[0] + sim_den[1]) * (sim_vel[0] + sim_vel[1])/2 * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
     elif run_species == "alphas":
-        # Upstream alpha flux [cm^-2 s^-1]
-        sim_flux_upstream = sim_den[2] * sim_vel[2] * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-
-        log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+        if "Base" in case:
+            # Upstream alpha flux
+            sim_flux_upstream = sim_den[2] * sim_vel[2] * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+        elif "HNHV" in case and not post_icme:
+            # Upstream alpha flux
+            sim_flux_upstream = (sim_den[2] + sim_den[3]) * (sim_vel[2] + sim_vel[3]) / 2 * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
 
     # Plot
     if "RPN" in case: row, col = 0, 0
@@ -105,21 +119,38 @@ for case in cases:
     elif "RPS" in case: row, col = 0, 1
     elif "CPS" in case: row, col = 1, 1
 
-    if plot_meth == "raw":
-        data = flux_abs
-        c_min = 0.5e8
-        c_max = 8.5e8
-        ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
-    elif plot_meth == "log":
-        data = log_flx
-        c_min = 3.5
-        c_max = 9.5
-        ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
-    elif plot_meth == "lognorm":
-        data = log_flx_norm
-        c_min = -5.5
-        c_max = 1.0
-        ax_lab = r"$\log_{10}$(F/F$_0$)"
+    if "Base" in case:
+        if plot_meth == "raw":
+            data = flux_abs
+            c_min = 0.5e8
+            c_max = 8.5e8
+            ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
+        elif plot_meth == "log":
+            data = log_flx
+            c_min = 3.5
+            c_max = 9.5
+            ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
+        elif plot_meth == "lognorm":
+            data = log_flx_norm
+            c_min = -5.5
+            c_max = 1.0
+            ax_lab = r"$\log_{10}$(F/F$_0$)"
+    elif "HNHV" in case and not post_icme:
+        if plot_meth == "raw":
+            data = flux_abs
+            c_min = np.nanmin(data)
+            c_max = np.nanmax(data)
+            ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
+        elif plot_meth == "log":
+            data = log_flx
+            c_min = 3.5
+            c_max = 9.5
+            ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
+        elif plot_meth == "lognorm":
+            data = log_flx_norm
+            c_min = -5.5
+            c_max = 1.0
+            ax_lab = r"$\log_{10}$(F/F$_0$)"
 
     ax = axs[row, col]
     ax.grid(True, alpha=0.3, linestyle="dotted", color="gray")
@@ -152,17 +183,27 @@ for case in cases:
 
     ax.set_title(case.split("_")[0])
 
-if run_species == "all":
-    stitle = f"Pre-Transient (All species)"
-elif run_species == "protons":
-    stitle = f"Pre-Transient (H+)"
-elif run_species == "alphas":
-    stitle = f"Pre-Transient (He++)"
+if "Base" in cases[0]:
+    outfname = f"all_cases_{run_species}_surface_precipitation_pre-transient_{plot_meth}.png"
+    if run_species == "all":
+        stitle = f"Pre-Transient (All species)"
+    elif run_species == "protons":
+        stitle = f"Pre-Transient (H+)"
+    elif run_species == "alphas":
+        stitle = f"Pre-Transient (He++)"
+elif "HNHV" in cases[0] and not post_icme:
+    outfname = f"all_cases_{run_species}_surface_precipitation_transient_{plot_meth}.png"
+    if run_species == "all":
+        stitle = f"Transient (All species)"
+    elif run_species == "protons":
+        stitle = f"Transient (H+)"
+    elif run_species == "alphas":
+        stitle = f"Transient (He++)"
 
 fig.suptitle(stitle, fontsize=18, y=0.98)
 # Save figure
 plt.tight_layout()
-outfile_png = os.path.join(output_folder, f"all_cases_{run_species}_surface_precipitation_pre-transient_{plot_meth}.png")
+outfile_png = os.path.join(output_folder, outfname)
 
 plt.savefig(outfile_png, dpi=200, bbox_inches="tight")
 print("Saved figure:", outfile_png)

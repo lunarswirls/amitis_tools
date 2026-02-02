@@ -250,7 +250,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
         return flx_map, vr_map, macro_hits, n_shell_map  # [m^-2 s^-1, km/s, #, m^-3]
 
-    # ========== Main logic: sum over species ==========
+    # weighted sum over species
     if species == "all":
         flux_map = np.zeros((n_lat, n_lon))
         v_r_num = np.zeros((n_lat, n_lon))
@@ -274,13 +274,57 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
 
     else:
-        spec_id = 0 if species == "protons" else 2
-        flux_map, v_r_map, count_map, n_shell_map = process_species(spec_id)
+        if "Base" in all_particles_filename:
+            spec_id = 0 if species == "protons" else 2
+            flux_map, v_r_map, count_map, n_shell_map = process_species(spec_id)
+        elif "HNHV" in all_particles_filename:
+            if species == "protons":
+                flux_map = np.zeros((n_lat, n_lon))
+                v_r_num = np.zeros((n_lat, n_lon))
+                v_r_den = np.zeros((n_lat, n_lon))
+                count_map = np.zeros((n_lat, n_lon))
+                n_shell_map = np.zeros((n_lat, n_lon))
+
+                for spec_id in [0, 1]:
+                    F_s, v_r_s, C_s, n_s = process_species(spec_id)
+                    flux_map += F_s
+                    count_map += C_s
+                    n_shell_map += n_s
+
+                    # Density-weighted combination of v_r over species [km/s]:
+                    # Weight by shell density n_s [m^-3] in each bin
+                    v_r_num += v_r_s * n_s
+                    v_r_den += n_s
+
+                v_r_map = np.zeros_like(flux_map)
+                mask = v_r_den > 1e3  # [m^-3] floor
+                v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
+            elif species == "alphas":
+                flux_map = np.zeros((n_lat, n_lon))
+                v_r_num = np.zeros((n_lat, n_lon))
+                v_r_den = np.zeros((n_lat, n_lon))
+                count_map = np.zeros((n_lat, n_lon))
+                n_shell_map = np.zeros((n_lat, n_lon))
+
+                for spec_id in [2, 3]:
+                    F_s, v_r_s, C_s, n_s = process_species(spec_id)
+                    flux_map += F_s
+                    count_map += C_s
+                    n_shell_map += n_s
+
+                    # Density-weighted combination of v_r over species [km/s]:
+                    # Weight by shell density n_s [m^-3] in each bin
+                    v_r_num += v_r_s * n_s
+                    v_r_den += n_s
+
+                v_r_map = np.zeros_like(flux_map)
+                mask = v_r_den > 1e3  # [m^-3] floor
+                v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
 
     # Convert flux to [cm^-2 s^-1]
     flux_map_cm = flux_map * 1e-4  # [m^-2 s^-1] → [cm^-2 s^-1]
 
-    # ========== FINAL OUTPUT STATISTICS ==========
+    # DEBUG OUTPUT STATISTICS
     print("=" * 60)
     print("FINAL MAPS STATISTICS")
     print("=" * 60)

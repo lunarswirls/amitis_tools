@@ -6,12 +6,12 @@ import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
 plot_meth = "log"  # raw, log, lognorm
-run_species = "protons"  # 'all' or 'protons' or 'alphas'
+run_species = "all"  # 'all' or 'protons' or 'alphas'
 
-species = np.array(['H+', 'tbd', 'He++', 'tbd2'])  # The order is important and it should be based on Amitis.inp file
-sim_ppc = [24, 0, 11, 0]  # Number of particles per species, based on Amitis.inp
-sim_den = [38.0e6, 0, 1.0e6, 0]  # [/m^3]
-sim_vel = [400.e3, 0, 400.e3, 0]  # [m/s]
+species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
+sim_ppc = [24, 24, 11, 11]  # Number of particles per species, based on Amitis.inp
+sim_den = [38.0e6, 76.0e6, 1.0e6, 2.0e6]   # [/m^3]
+sim_vel = [400.e3, 700.0e3, 400.e3, 700.0e3]  # [km/s]
 
 sim_dx = 75.e3  # simulation cell size based on Amitis.inp
 sim_dy = 75.e3  # simulation cell size based on Amitis.inp
@@ -25,14 +25,23 @@ select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface f
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
 
-cases = ["RPN_Base", "CPN_Base", "RPS_Base", "CPS_Base"]
+cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+post_icme = False
+
 stats_cases_all = []
 
 for case in cases:
-    main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
+    if "Base" in case:
+        main_path = f"/Volumes/data_backup/mercury/extreme/{case}/05/"
+    elif "HNHV" in case:
+        if post_icme:
+            main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
+        else:
+            main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/"
 
     all_particles_directory = main_path + 'precipitation/'
-    all_particles_filename = all_particles_directory + "all_particles_at_surface.npz"
+    all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map = \
         flux_utils.compute_radial_flux(
@@ -71,12 +80,18 @@ for case in cases:
 
     log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
 
-    stats_case = flux_utils.compute_flux_statistics(flux_abs, lat_centers, lon_centers,
-                                          R_M=2439.7e3, case_name=case.split("_")[0])
+    stats_case = flux_utils.compute_flux_statistics(flux_abs, lat_centers, lon_centers, R_M=2440.0e3, case_name=case.split("_")[0])
 
     stats_cases_all.append(stats_case)
 
-outcsv = os.path.join(output_folder, 'base_flux_comparison.csv')
-outtex = os.path.join(output_folder, 'base_flux_comparison.tex')
+if "Base" in cases[0]:
+    outcsv = os.path.join(output_folder, 'pre-transient_flux_comparison.csv')
+    outtex = os.path.join(output_folder, 'pre-transient_flux_comparison.tex')
+elif "HNHV" in cases[0] and not post_icme:
+    outcsv = os.path.join(output_folder, 'transient_flux_comparison.csv')
+    outtex = os.path.join(output_folder, 'transient_flux_comparison.tex')
+elif "HNHV" in cases[0] and post_icme:
+    outcsv = os.path.join(output_folder, 'post-transient_flux_comparison.csv')
+    outtex = os.path.join(output_folder, 'post-transient_flux_comparison.tex')
 
 df = flux_utils.create_comparison_table(stats_cases_all, output_csv=outcsv, output_latex=outtex)
