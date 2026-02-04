@@ -1,13 +1,13 @@
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
-case = "CPN"
+case = "CPS"
 sim_step = 350000
 filename = f'Amitis_{case}_HNHV_' + "%06d"%(sim_step)
 compress = True
 # obj_hdf  = amitis_hdf(f'/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/10/out/', filename + '.h5')
 
-input_folder = f"/Users/danywaller/Projects/mercury/extreme/CPN_Base_largerxdomain_smallergridsize/out/"
+input_folder = f"/Users/danywaller/Projects/mercury/extreme/CPS_Base_largerxdomain_smallergridsize/out/"
 obj_hdf = amitis_hdf(input_folder, f"Amitis_{case}_Base_115000.h5")
 
 debug = False
@@ -41,8 +41,6 @@ if debug:
 #####################################################
 if 1:
     bdx = obj_hdf.load_dataset('Bdx', 1.0e9)
-    print(bdx.shape)
-
     bdy = obj_hdf.load_dataset('Bdy', 1.0e9)
     bdz = obj_hdf.load_dataset('Bdz', 1.0e9)
     bdmag = np.sqrt(bdx**2 + bdy**2 + bdz**2)
@@ -67,6 +65,11 @@ if 1:
     rho_tot = obj_hdf.load_dataset('rho_tot')    # Total Charge Density: qn
     den_tot = rho_tot*1.e-6 / obj_hdf.get_mean_charge()   # calculating total number density in units of [#/cm^3]
 
+    den01 = obj_hdf.load_dataset('rho01') * 1.e-6 / obj_hdf.get_charge(1)  # [#/cm^3]
+    den02 = obj_hdf.load_dataset('rho02') * 1.e-6 / obj_hdf.get_charge(2)  # [#/cm^3]
+    den03 = obj_hdf.load_dataset('rho03') * 1.e-6 / obj_hdf.get_charge(3)  # [#/cm^3]
+    den04 = obj_hdf.load_dataset('rho04') * 1.e-6 / obj_hdf.get_charge(4)  # [#/cm^3]
+
     # Calcluate total plasma velocity
     jix = obj_hdf.load_dataset('jix_tot')   # rho_tot * vx
     jiy = obj_hdf.load_dataset('jiy_tot')   # rho_tot * vy
@@ -87,8 +90,8 @@ if 1:
 #####################################################
 # Open, write, and close netcdf file with real data
 # Comparison with original data file by eye for example with Panoply
-obj_netcdf = amitis_netcdf(obj_hdf.file_path, filename + '.nc', sim_step, 
-                           original_domain, 
+obj_netcdf = amitis_netcdf(obj_hdf.file_path, filename + '.nc', sim_step,
+                           original_domain,
                            compression=compress) #, trimmed_domain)
 obj_netcdf.open()
 obj_netcdf.write_hdf_attributes(obj_hdf)
@@ -104,6 +107,11 @@ obj_netcdf.write(bz      , 'Bz'      , 'nT'  )
 obj_netcdf.write(bmag    , 'Bmag'    , 'nT'  )
 
 if 1:
+    obj_netcdf.write(den01, 'den01', 'cm-3')
+    obj_netcdf.write(den02, 'den02', 'cm-3')
+    obj_netcdf.write(den03, 'den03', 'cm-3')
+    obj_netcdf.write(den04, 'den04', 'cm-3')
+
     obj_netcdf.write(den_tot , 'den_tot' , 'cm-3')
 
     obj_netcdf.write(vx      , 'vx_tot'  , 'km/s')
