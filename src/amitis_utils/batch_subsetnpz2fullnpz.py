@@ -26,7 +26,7 @@ if "Base" in case:
     sim_steps = list(range(100000, 115000 + 1, 1000))
 elif "HNHV" in case:
     if post_icme:
-        sim_steps = range(165000, 197000 + 1, 1000)  # post-sheath
+        sim_steps = range(170000, 180000 + 1, 1000)  # post-sheath
     else:
         sim_steps = range(140000, 150000 + 1, 1000)  # sheath
 
