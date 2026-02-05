@@ -11,14 +11,19 @@ cases = ["RPN_Base", "CPN_Base", "RPS_Base", "CPS_Base"]
 for case in cases:
     main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
     output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
+    os.makedirs(output_folder, exist_ok=True)
 
-    plot_meth = "raw"  # raw, log, lognorm
-    run_species = "alphas"  # 'all' or 'protons' or 'alphas'
+    plot_meth = "lognorm"  # raw, log, lognorm
+    run_species = "all"  # 'all' or 'protons' or 'alphas'
 
-    species = np.array(['H+', 'tbd', 'He++', 'tbd2'])  # The order is important and it should be based on Amitis.inp file
+    species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
     sim_ppc = [24, 0, 11, 0]  # Number of particles per species, based on Amitis.inp
     sim_den = [38.0e6, 0, 1.0e6, 0]   # [/m^3]
     sim_vel = [400.e3, 0, 400.e3, 0]  # [m/s]
+
+    # Species properties
+    species_mass = np.array([1.0, 0.0, 4.0, 0.0])  # [amu] proton1, proton2, alpha1, alpha2
+    species_charge = np.array([1.0, 0.0, 2.0, 0.0])  # [e] proton1, proton2, alpha1, alpha2
 
     sim_dx = 75.e3  # simulation cell size based on Amitis.inp [m]
     sim_dy = 75.e3  # simulation cell size based on Amitis.inp [m]
@@ -40,7 +45,7 @@ for case in cases:
             print(f"Loaded {len(df_footprints)} footprints for {case}")
 
     all_particles_directory = main_path + 'precipitation/'
-    all_particles_filename = all_particles_directory + "all_particles_at_surface.npz"
+    all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map = \
         flux_utils.compute_radial_flux(
@@ -56,27 +61,24 @@ for case in cases:
     n_lon = len(lon_centers)
 
     # Rebuild bin edges consistent with centers
-    lon_edges = np.linspace(-180.0, 180.0, n_lon+1)
-    lat_edges = np.linspace(-90.0, 90.0, n_lat+1)
+    lon_edges = np.linspace(-180.0, 180.0, n_lon + 1)
+    lat_edges = np.linspace(-90.0, 90.0, n_lat + 1)
 
     # ========== 2D maps with units ==========
-    cnts = count_map.copy()     # [# particles]
-    den  = n_shell_map.copy()   # [m^-3] shell volume density
-    vr   = v_r_map.copy()       # [km/s]
-    flux = flux_cm.copy()       # [cm^-2 s^-1]
+    cnts = count_map.copy()  # [# particles]
+    den_cm3 = n_shell_map.copy()  # [cm^-3] shell volume density
+    vr = v_r_map.copy()  # [km/s]
+    flux = flux_cm.copy()  # [cm^-2 s^-1]
 
-    vr_abs = np.abs(vr)         # [km/s]
-    flux_abs = np.abs(flux)     # [cm^-2 s^-1]
+    vr_abs = np.abs(vr)  # [km/s]
+    flux_abs = np.abs(flux)  # [cm^-2 s^-1]
 
     # Set low-count pixels to NaN
-    mask = count_map <= 1e-20
+    mask = count_map <= 1e-30
     cnts[mask] = np.nan
-    den[mask]  = np.nan
+    den_cm3[mask] = np.nan
     vr_abs[mask] = np.nan
     flux_abs[mask] = np.nan
-
-    # ========== Unit conversions ==========
-    den_cm3 = den * 1e-6  # [m^-3] → [cm^-3]
 
     # ========== Logarithmic maps ==========
     log_cnts = helper_utils.safe_log10(cnts)
@@ -85,19 +87,69 @@ for case in cases:
     log_flx  = helper_utils.safe_log10(flux_abs) # log10(cm^-2 s^-1)
 
     # ========== Normalized maps ==========
-    # Total upstream density [m^-3]
-    sim_den_tot = np.sum(sim_den)
+    if run_species == "all":
+        if "Base" in case:
+            # Total upstream number density from quasi-neutrality Σ(Z_i * n_i) [m^-3]
+            sim_den_tot = np.sum(species_charge * sim_den)  # [m^-3]
 
-    # Upstream velocity [km/s]
-    sim_vel_tot = np.mean(sim_vel) * 1e-3  # [m/s] → [km/s]
+            # Mass-weighted upstream velocity [km/s]
+            # v_avg = Σ(m_i * n_i * v_i) / Σ(m_i * n_i)
+            mass_weighted_velocity = np.sum(species_mass * sim_den * sim_vel) / np.sum(species_mass * sim_den)
+            sim_vel_tot = mass_weighted_velocity * 1e-3  # [m/s] → [km/s]
 
-    # Upstream flux [cm^-2 s^-1]
-    sim_flux_upstream = sim_den_tot * np.mean(sim_vel) * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+            # Upstream flux using mass-weighted velocity [cm^-2 s^-1]
+            sim_flux_upstream = sim_den_tot * mass_weighted_velocity * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
 
-    # Normalized quantities
-    log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
-    log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)            # [km/s] / [km/s]
-    log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)    # [cm^-2 s^-1] / [cm^-2 s^-1]
+            # Normalized quantities
+            log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
+            log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)  # [km/s] / [km/s]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+
+    elif run_species == "protons":
+        if "Base" in case:
+            # Single proton species (index 0)
+
+            # Total upstream number density from quasi-neutrality Σ(Z_i * n_i) [m^-3]
+            sim_den_tot = species_charge[0] * sim_den[0]  # [m^-3]
+
+            # Mass-weighted upstream velocity [km/s]
+            # v_avg = Σ(m_i * n_i * v_i) / Σ(m_i * n_i)
+            mass_weighted_velocity = (species_mass[0] * sim_den[0] * sim_vel[0]) / (species_mass[0] * sim_den[0])
+            sim_vel_tot = mass_weighted_velocity * 1e-3  # [m/s] → [km/s]
+
+            # Upstream flux using mass-weighted velocity [cm^-2 s^-1]
+            sim_flux_upstream = sim_den_tot * mass_weighted_velocity * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+
+            # Normalized quantities
+            log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
+            log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)  # [km/s] / [km/s]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+
+    elif run_species == "alphas":
+        if "Base" in case:
+            # Single alpha species (index 2)
+
+            # Total upstream number density from quasi-neutrality Σ(Z_i * n_i) [m^-3]
+            sim_den_tot = species_charge[2] * sim_den[2]  # [m^-3]
+
+            # Mass-weighted upstream velocity [km/s]
+            # v_avg = Σ(m_i * n_i * v_i) / Σ(m_i * n_i)
+            mass_weighted_velocity = (species_mass[2] * sim_den[2] * sim_vel[2]) / (species_mass[2] * sim_den[2])
+            sim_vel_tot = mass_weighted_velocity * 1e-3  # [m/s] → [km/s]
+
+            # Upstream flux using mass-weighted velocity [cm^-2 s^-1]
+            sim_flux_upstream = sim_den_tot * mass_weighted_velocity * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
+
+            # Normalized quantities
+            log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
+            log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)  # [km/s] / [km/s]
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+
+    # Debug output
+    print(f"Upstream normalization values:")
+    print(f"  Total density: {sim_den_tot * 1e-6:.1f} cm^-3")
+    print(f"  Mass-weighted velocity: {sim_vel_tot:.1f} km/s")
+    print(f"  Upstream flux: {sim_flux_upstream:.2e} cm^-2 s^-1")
 
     # Define fields for plotting
     fields_raw = [
@@ -118,7 +170,7 @@ for case in cases:
         (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles", "magenta"),
         (log_den_norm, (-1, 1), "cividis", r"log$_{10}$($n/n_0$)", "magenta"),
         (log_vel_norm, (-1.0, 0.0), "plasma", r"log$_{10}$($|v_r|/v_0$)", "magenta"),
-        (log_flx_norm, (-2, 1), "jet", r"log$_{10}$($F_r/F_0$)", "magenta")
+        (log_flx_norm, (0, 4), "jet", r"log$_{10}$($F_r/F_0$)", "magenta")
     ]
 
     if plot_meth == 'raw':

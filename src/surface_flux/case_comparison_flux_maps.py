@@ -8,8 +8,8 @@ import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
 # SETTINGS
-# cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
-cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
 post_icme = False
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_flux/"
@@ -19,7 +19,7 @@ debug = False
 footprints = False
 
 plot_meth = "lognorm"  # raw, log, lognorm
-run_species = "alphas"  # 'all' or 'protons' or 'alphas'
+run_species = "all"  # 'all' or 'protons' or 'alphas'
 
 species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
 sim_ppc = [24, 24, 11, 11]  # Number of particles per species, based on Amitis.inp
@@ -70,7 +70,7 @@ for case in cases:
 
     # ========== 2D maps with units ==========
     cnts = count_map.copy()  # [# particles]
-    den = n_shell_map.copy()  # [m^-3] shell volume density
+    den = n_shell_map.copy()  # [cm^-3] shell volume density
     vr = v_r_map.copy()  # [km/s]
     flux = flux_cm.copy()  # [cm^-2 s^-1]
 
@@ -86,32 +86,70 @@ for case in cases:
 
     log_flx = helper_utils.safe_log10(flux_abs)
 
+    # Species properties
+    species_mass = np.array([1.0, 1.0, 4.0, 4.0])  # [amu] proton1, proton2, alpha1, alpha2
+    species_charge = np.array([1.0, 1.0, 2.0, 2.0])  # [e] proton1, proton2, alpha1, alpha2
+
     if run_species == "all":
-        # Total upstream density
-        sim_den_tot = np.sum(sim_den)
-        # Upstream velocity
-        sim_vel_tot = np.mean(sim_vel) * 1e-3  # [m/s] → [km/s]
-        # Upstream flux
-        sim_flux_upstream = sim_den_tot * np.mean(sim_vel) * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-        log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+        if "Base" in case:
+            # Total upstream density from quasi-neutrality: n_e = Σ(Z_i * n_i) [m^-3]
+            all_mass_den = species_mass[0] * sim_den[0] + species_mass[2] * sim_den[2]
+            all_vel_avg = (species_mass[0] * sim_den[0] * sim_vel[0] +
+                              species_mass[2] * sim_den[2] * sim_vel[2]) / all_mass_den
+
+            # Total number density
+            all_den_tot = sim_den[0] + sim_den[2]  # [m^-3]
+
+            # Upstream flux [cm^-2 s^-1]
+            sim_flux_upstream = all_den_tot * all_vel_avg * 1e-4
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)
+        elif "HNHV" in case:
+            # Total upstream density from quasi-neutrality: n_e = Σ(Z_i * n_i) [m^-3]
+            sim_den_tot = np.sum(species_charge * sim_den)
+
+            # Mass-weighted upstream velocity [m/s]
+            sim_vel_tot_ms = np.sum(species_mass * sim_den * sim_vel) / np.sum(species_mass * sim_den)
+            sim_vel_tot = sim_vel_tot_ms * 1e-3  # [km/s]
+
+            # Upstream flux [cm^-2 s^-1]
+            sim_flux_upstream = sim_den_tot * sim_vel_tot_ms * 1e-4
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)
+
     elif run_species == "protons":
         if "Base" in case:
-            # Upstream proton flux
-            sim_flux_upstream = sim_den[0] * sim_vel[0] * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+            # Single proton species (index 0)
+            sim_flux_upstream = sim_den[0] * sim_vel[0] * 1e-4
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)
+
         elif "HNHV" in case and not post_icme:
-            # Upstream proton flux
-            sim_flux_upstream = (sim_den[0] + sim_den[1]) * (sim_vel[0] + sim_vel[1])/2 * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+            # Two proton species (indices 0, 1) - mass-weighted
+            proton_mass_den = species_mass[0] * sim_den[0] + species_mass[1] * sim_den[1]
+            proton_vel_avg = (species_mass[0] * sim_den[0] * sim_vel[0] +
+                              species_mass[1] * sim_den[1] * sim_vel[1]) / proton_mass_den
+
+            # Total proton number density
+            proton_den_tot = sim_den[0] + sim_den[1]
+
+            sim_flux_upstream = proton_den_tot * proton_vel_avg * 1e-4
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)
+
     elif run_species == "alphas":
         if "Base" in case:
-            # Upstream alpha flux
-            sim_flux_upstream = sim_den[2] * sim_vel[2] * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+            # Single alpha species (index 2)
+            sim_flux_upstream = sim_den[2] * sim_vel[2] * 1e-4
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)
+
         elif "HNHV" in case and not post_icme:
-            # Upstream alpha flux
-            sim_flux_upstream = (sim_den[2] + sim_den[3]) * (sim_vel[2] + sim_vel[3]) / 2 * 1e-4  # [m^-3 * m/s] → [cm^-2 s^-1]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
+            # Two alpha species (indices 2, 3) - mass-weighted
+            alpha_mass_den = species_mass[2] * sim_den[2] + species_mass[3] * sim_den[3]
+            alpha_vel_avg = (species_mass[2] * sim_den[2] * sim_vel[2] +
+                             species_mass[3] * sim_den[3] * sim_vel[3]) / alpha_mass_den
+
+            # Total alpha number density
+            alpha_den_tot = sim_den[2] + sim_den[3]
+
+            sim_flux_upstream = alpha_den_tot * alpha_vel_avg * 1e-4
+            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)
 
     # Plot
     if "RPN" in case: row, col = 0, 0
@@ -132,8 +170,8 @@ for case in cases:
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
-            c_min = -5.5
-            c_max = 1.0
+            c_min = 0.0
+            c_max = 5.0
             ax_lab = r"$\log_{10}$(F/F$_0$)"
     elif "HNHV" in case and not post_icme:
         if plot_meth == "raw":
@@ -148,8 +186,8 @@ for case in cases:
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
-            c_min = -5.5
-            c_max = 1.0
+            c_min = 0.0
+            c_max = 5.0
             ax_lab = r"$\log_{10}$(F/F$_0$)"
 
     ax = axs[row, col]

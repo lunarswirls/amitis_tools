@@ -12,11 +12,6 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     Compute particle counts, density, radial velocity, and surface flux in
     spherical coordinates for particles impacting the surface at r = R_M.
 
-    Returns shell volume density [m^-3] and surface quantities
-    - Particles selected from shell R_M <= r <= select_R
-    - Ray-traced to surface impact points
-    - Shell density [m^-3], surface flux [cm^-2 s^-1], impact velocity [km/s]
-
     Parameters
     ----------
     all_particles_filename : str
@@ -26,10 +21,9 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     sim_ppc : array-like
         Macroparticles per simulation grid cell per species.
     sim_den : array-like
-        Physical number density per species in the upstream region [m^-3]
-        corresponding to each species' macroparticles.
+        Physical number density per species in the upstream region [m^-3].
     spec_map : array-like
-        Name of each species
+        Name of each species.
     R_M : float
         Planet radius [m].
     select_R : float
@@ -42,21 +36,20 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     Returns
     -------
     flux_map_cm : ndarray (n_lat, n_lon)
-        Radial surface flux [cm^-2 s^-1].
+        Surface precipitation flux [cm^-2 s^-1].
     lat_centers : ndarray
         Latitude bin centers [deg].
     lon_centers : ndarray
         Longitude bin centers [deg].
     v_r_map : ndarray (n_lat, n_lon)
-        Impact velocity for surface precipitation [km/s].
-        Negative = inward.
+        Mass-weighted impact velocity [km/s]. Negative = inward.
     count_map : ndarray (n_lat, n_lon)
-        Physical particle count per surface bin [# particles].
-    n_shell_map : ndarray (n_lat, n_lon)
-        Shell volume density [m^-3].
+        Physical particle count in shell [# particles].
+    den_map_cm3 : ndarray (n_lat, n_lon)
+        Shell volume-averaged number density [cm^-3].
     """
 
-    # Load particle data
+    # ========== Load particle data ==========
     with np.load(all_particles_filename) as data:
         prx = data["prx"]  # [m]
         pry = data["pry"]  # [m]
@@ -64,7 +57,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         pvx = data["pvx"]  # [m/s]
         pvy = data["pvy"]  # [m/s]
         pvz = data["pvz"]  # [m/s]
-        psid = data["psid"].astype(int)  # ensure integer indexing
+        psid = data["psid"].astype(int)
         num_files = data["num_files"]
         selected_radius = data["selected_radius"]  # [m]
 
@@ -74,7 +67,12 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     sim_ppc = np.asarray(sim_ppc, dtype=float)
     sim_den = np.asarray(sim_den, dtype=float)
 
-    # Angular binning (spherical surface at R_M)
+    # Species properties (adjust to match your spec_map ordering)
+    species_mass = np.array([1.0, 1.0, 4.0, 4.0])  # [amu]
+    species_charge = np.array([1.0, 1.0, 2.0, 2.0])  # [e]
+
+    # ========== Geometric setup ==========
+    # Angular binning
     lon_edges = np.linspace(-180.0, 180.0, n_lon + 1)  # [deg]
     lat_edges = np.linspace(-90.0, 90.0, n_lat + 1)  # [deg]
     lon_centers = 0.5 * (lon_edges[:-1] + lon_edges[1:])
@@ -82,259 +80,246 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
     dlon = np.radians(lon_edges[1] - lon_edges[0])  # [rad]
 
-    # Surface area per (lat,lon) bin on sphere of radius R_M [m^2]
+    # Surface area per (lat,lon) bin on sphere radius R_M [m^2]
     area = R_M ** 2 * dlon * (np.sin(np.radians(lat_edges[1:])) -
                               np.sin(np.radians(lat_edges[:-1])))
-    area = area[:, None]  # broadcast over longitude, shape (n_lat, n_lon)
+    area = area[:, None]  # shape (n_lat, 1) for broadcasting
 
-    # ADDED: Shell volume per (lat,lon) bin for density calculation [m^3]
-    dR = select_R - R_M  # [m] shell thickness
-    shell_volume = area * dR  # [m^3/bin]
+    # Shell volume per (lat,lon) bin [m^3]
+    dR = select_R - R_M  # [m]
+    shell_volume = area * dR  # [m^3]
 
-    # Helper: per-species processing, returns surface maps
+    # ========== Per-species processing ==========
     def process_species(spec_id):
+        """
+        Process a single species and return maps.
+
+        Returns
+        -------
+        macro_count_map : Macroparticle count in shell [# macroparticles]
+        count_map : Physical particle count in shell [# particles]
+        flux_contribution : Flux contribution Σ(w_i * |v_r,i|) [# particles * m/s]
+        momentum_contribution : Mass-weighted momentum Σ(m * w_i * v_r,i) [amu * # particles * m/s]
+        mass_count : Mass-weighted count Σ(m * w_i) [amu * # particles]
+        """
         print(f"Processing species {spec_map[spec_id]}")
 
-        # Select species
+        # ========== 1) Select species ==========
         mask = psid == spec_id
-        prx_s, pry_s, prz_s = prx[mask], pry[mask], prz[mask]  # [m]
-        pvx_s, pvy_s, pvz_s = pvx[mask], pvy[mask], pvz[mask]  # [m/s]
+        prx_s = prx[mask]
+        pry_s = pry[mask]
+        prz_s = prz[mask]
+        pvx_s = pvx[mask]
+        pvy_s = pvy[mask]
+        pvz_s = pvz[mask]
 
-        print(f"Number of initial particles: {len(pvz_s)}")
+        print(f"  Initial macroparticles: {len(prx_s)}")
 
-        # Shell selection: R_M <= r <= select_R
+        # ========== 2) Shell selection: R_M <= r <= select_R ==========
         r = np.sqrt(prx_s ** 2 + pry_s ** 2 + prz_s ** 2)  # [m]
-        shell = (r >= R_M) & (r <= select_R)
-        prx_s, pry_s, prz_s = prx_s[shell], pry_s[shell], prz_s[shell]
-        pvx_s, pvy_s, pvz_s = pvx_s[shell], pvy_s[shell], pvz_s[shell]
-        r = r[shell]
+        shell_mask = (r >= R_M) & (r <= select_R)
 
-        print(f"Number of particles after shell selection: {len(r)}")
+        prx_s = prx_s[shell_mask]
+        pry_s = pry_s[shell_mask]
+        prz_s = prz_s[shell_mask]
+        pvx_s = pvx_s[shell_mask]
+        pvy_s = pvy_s[shell_mask]
+        pvz_s = pvz_s[shell_mask]
+        r = r[shell_mask]
+
+        print(f"  After shell selection: {len(r)}")
 
         if len(r) == 0:
             empty = np.zeros((n_lat, n_lon))
-            print("\n")
-            return empty, empty, empty, empty
+            return empty, empty, empty, empty, empty
 
-        # Radial unit vector and radial velocity [m/s]
-        r_hat = np.vstack((prx_s, pry_s, prz_s)) / r
-        v_r_s = pvx_s * r_hat[0] + pvy_s * r_hat[1] + pvz_s * r_hat[2]
+        # ========== 3) Compute radial velocity ==========
+        r_hat_x = prx_s / r
+        r_hat_y = pry_s / r
+        r_hat_z = prz_s / r
+        v_r = pvx_s * r_hat_x + pvy_s * r_hat_y + pvz_s * r_hat_z  # [m/s]
 
-        # Only particles on impact trajectories (inward)
-        inward = v_r_s < 0.0
-        prx_s, pry_s, prz_s = prx_s[inward], pry_s[inward], prz_s[inward]
-        pvx_s, pvy_s, pvz_s = pvx_s[inward], pvy_s[inward], pvz_s[inward]
-        v_r_s = v_r_s[inward]
-        r = r[inward]
+        # ========== 4) Select inward trajectories ==========
+        inward_mask = v_r < 0.0
 
-        print(f"Number of particles after inward trajectory selection: {len(r)}")
-        # Print statistics in both m/s and km/s
-        print(f"Radial velocity magnitudes [m/s]:")
-        print(f"  Min:    {np.min(v_r_s):.2e}")
-        print(f"  Median: {np.median(v_r_s):.2e}")
-        print(f"  Max:    {np.max(v_r_s):.2e}")
-        print("\n")
+        prx_s = prx_s[inward_mask]
+        pry_s = pry_s[inward_mask]
+        prz_s = prz_s[inward_mask]
+        pvx_s = pvx_s[inward_mask]
+        pvy_s = pvy_s[inward_mask]
+        pvz_s = pvz_s[inward_mask]
+        v_r = v_r[inward_mask]
 
-        if len(v_r_s) == 0:
+        print(f"  After inward selection: {len(v_r)}")
+        print(f"  v_r range: [{v_r.min():.2e}, {v_r.max():.2e}] m/s")
+
+        if len(v_r) == 0:
             empty = np.zeros((n_lat, n_lon))
-            return empty, empty, empty, empty
+            return empty, empty, empty, empty, empty
 
-        # ========== Ray–sphere intersection to project impact point to SURFACE ==========
+        # ========== 5) Ray-sphere intersection to find surface impact points ==========
+        r_vec = np.column_stack([prx_s, pry_s, prz_s])  # [m] shape (N, 3)
+        v_vec = np.column_stack([pvx_s, pvy_s, pvz_s])  # [m/s] shape (N, 3)
 
-        # Stack positions into a (N, 3) array [m]:
-        # r_vec[i] = [x_i, y_i, z_i] is the current position vector of particle i.
-        r_vec = np.vstack((prx_s, pry_s, prz_s)).T
+        # Solve |r0 + t*v|^2 = R_M^2
+        a = np.sum(v_vec ** 2, axis=1)  # [m^2/s^2]
+        b = 2.0 * np.sum(r_vec * v_vec, axis=1)  # [m^2/s]
+        c = np.sum(r_vec ** 2, axis=1) - R_M ** 2  # [m^2]
 
-        # Stack velocities into a (N, 3) array [m/s]:
-        # v_vec[i] = [vx_i, vy_i, vz_i] is the current velocity vector of particle i.
-        v_vec = np.vstack((pvx_s, pvy_s, pvz_s)).T
-
-        # Quadratic coefficients for ray–sphere intersection:
-        # For each particle, we solve |r(t)|^2 = R_M^2, where r(t) = r0 + t v.
-        # This gives a quadratic of the form: a*t^2 + b*t + c = 0.
-
-        # a = |v|^2 (squared speed) for each particle [m^2/s^2].
-        a = np.sum(v_vec ** 2, axis=1)
-
-        # b = 2 (r0 · v) for each particle (dot product) [m^2/s].
-        b = 2.0 * np.sum(r_vec * v_vec, axis=1)
-
-        # c = |r0|^2 - R_M^2 [m^2].
-        c = np.sum(r_vec ** 2, axis=1) - R_M ** 2
-
-        # Discriminant of the quadratic: disc = b^2 - 4 a c [m^4/s^2].
-        # If disc < 0, the ray does not intersect the sphere.
         disc = b ** 2 - 4 * a * c
+        valid_intersection = disc > 0.0
 
-        # Keep only particles whose trajectories intersect the sphere at least once.
-        valid = disc > 0.0
+        print(f"  After intersection check: {valid_intersection.sum()}")
 
-        # Filter positions, velocities, and radial velocities to intersecting particles only.
-        r_vec = r_vec[valid]
-        v_vec = v_vec[valid]
-        v_r_s = v_r_s[valid]
-
-        print(f"Number of particles with intersecting trajectory: {len(r_vec)}")
-        # Print statistics in both m/s and km/s
-        print(f"Radial velocity magnitudes [m/s]:")
-        print(f"  Min:    {np.min(v_r_s):.2e}")
-        print(f"  Median: {np.median(v_r_s):.2e}")
-        print(f"  Max:    {np.max(v_r_s):.2e}")
-        print("\n")
-
-        # If nothing intersects, return empty maps (no impacts on the surface).
-        if len(v_r_s) == 0:
+        if valid_intersection.sum() == 0:
             empty = np.zeros((n_lat, n_lon))
-            return empty, empty, empty, empty
+            return empty, empty, empty, empty, empty
 
-        # Solve for the first intersection time along the ray [s]:
-        # t_hit = (-b - sqrt(disc)) / (2 a) is the smaller root (entry point).
-        t_hit = (-b[valid] - np.sqrt(disc[valid])) / (2 * a[valid])
+        # Apply intersection filter
+        r_vec = r_vec[valid_intersection]
+        v_vec = v_vec[valid_intersection]
+        v_r = v_r[valid_intersection]
+        a = a[valid_intersection]
+        b = b[valid_intersection]
+        disc = disc[valid_intersection]
 
-        # Compute the impact positions on the sphere [m]:
-        # hit[i] = r0_i + t_hit_i * v_i lies on the surface |hit| = R_M.
-        hit = r_vec + v_vec * t_hit[:, None]
+        # Time to impact [s]
+        t_impact = (-b - np.sqrt(disc)) / (2 * a)
 
-        # Extract Cartesian coordinates of impact points [m].
-        x, y, z = hit[:, 0], hit[:, 1], hit[:, 2]
+        # Impact position on surface [m]
+        impact_pos = r_vec + v_vec * t_impact[:, np.newaxis]
+        x_impact = impact_pos[:, 0]
+        y_impact = impact_pos[:, 1]
+        z_impact = impact_pos[:, 2]
 
-        # Geographic coordinates of SURFACE IMPACTS (+X sunward, +Z north) [deg]
-        lon_s = np.degrees(np.arctan2(y, x))  # [-180, 180]
-        lat_s = np.degrees(np.arcsin(z / R_M))  # [-90, 90]
+        # ========== 6) Convert to geographic coordinates ==========
+        lon_impact = np.degrees(np.arctan2(y_impact, x_impact))  # [-180, 180] deg
+        lat_impact = np.degrees(np.arcsin(z_impact / R_M))  # [-90, 90] deg
 
-        # ========== Per-particle physical weight [# particles per macroparticle] ==========
-        # One macroparticle represents this many real particles.
-        # Use upstream density [m^-3] and cell volume [m^3], normalized over num_files.
+        # ========== 7) Compute physical weights ==========
+        # Each macroparticle represents w physical particles
         cell_volume = sim_dx * sim_dy * sim_dz  # [m^3]
-        w_species = (sim_den[spec_id] * cell_volume) / (sim_ppc[spec_id] * num_files)
+        w = (sim_den[spec_id] * cell_volume) / (sim_ppc[spec_id] * num_files)  # [# particles]
 
-        weights = w_species * np.ones_like(lat_s)  # [# particles/macroparticle]
+        weights = w * np.ones(len(lat_impact))  # [# particles per macroparticle]
 
-        # ========== 1) Count map: physically weighted particle count [# particles/bin] ==========
-        count_map, _, _ = np.histogram2d(lat_s, lon_s, bins=[lat_edges, lon_edges], weights=weights)
+        print(f"  Macroparticle weight: {w:.2e} physical particles")
+        print(f"  Total macroparticles: {len(lat_impact)}")
+        print(f"  Total physical particles: {weights.sum():.2e}\n")
 
-        # ========== 2) Shell Volume density [m^-3] ==========
-        n_shell_map = np.where(shell_volume > 0.0, count_map / shell_volume, 0.0)  # [m^-3]
-
-        # ========== 3) Surface flux [m^-2 s^-1] ==========
-        # Flux = sum(n * v_r) / area, where v_r is negative for inward
-        nv_r_map, _, _ = np.histogram2d(
-            lat_s, lon_s, bins=[lat_edges, lon_edges],
-            weights=weights * v_r_s  # [# particles * m/s]
+        # ========== 8) Histogram onto surface bins ==========
+        # Macroparticle count: number of simulation macroparticles
+        macro_count_map, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
+            weights=None  # [# macroparticles]
         )
-        # flux_map = np.where(area > 0.0, nv_r_map / area, 0.0)  # [m^-2 s^-1]
 
-        # ========== 4) Impact velocity [km/s] (density-weighted average) ==========
-        # v_r = sum(n * v_r) / sum(n)
-        v_r_hist, _, _ = np.histogram2d(
-            lat_s, lon_s, bins=[lat_edges, lon_edges],
-            weights=weights * v_r_s  # [# particles * m/s]
-        )
-        n_hist, _, _ = np.histogram2d(
-            lat_s, lon_s, bins=[lat_edges, lon_edges],
+        # Physical particle count: total number of physical particles
+        count_map, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
             weights=weights  # [# particles]
         )
 
-        macro_hits = count_map / w_species
+        # Flux contribution: Σ(w_i * |v_r,i|) for computing flux
+        # Note: v_r is negative, so use -v_r for magnitude
+        flux_contribution, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
+            weights=weights * (-v_r)  # [# particles * m/s]
+        )
 
-        vr_map = np.zeros((n_lat, n_lon))
-        n_floor = 1e10  # [# particles] minimum for reliable statistics
-        valid_bins = n_hist > n_floor
-        if np.any(valid_bins):
-            v_r_raw = v_r_hist[valid_bins] / n_hist[valid_bins]  # [m/s]
-            vr_map[valid_bins] = v_r_raw * 1e-3  # [km/s]
-            # Clip unphysical velocities (should not be needed)
-            vr_map[valid_bins] = np.clip(vr_map[valid_bins], -3000, 0)
+        # For velocity: need mass-weighted sums
+        m = species_mass[spec_id]  # [amu]
 
-        flx_map = vr_map * 1e3 * n_shell_map  # [m^-2 s^-1]
+        # Mass-weighted momentum: Σ(m * w_i * v_r,i)
+        momentum_contribution, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
+            weights=m * weights * v_r  # [amu * # particles * m/s]
+        )
 
-        return flx_map, vr_map, macro_hits, n_shell_map  # [m^-2 s^-1, km/s, #, m^-3]
+        # Mass-weighted count: Σ(m * w_i)
+        mass_count, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
+            weights=m * weights  # [amu * # particles]
+        )
 
-    # weighted sum over species
+        return macro_count_map, count_map, flux_contribution, momentum_contribution, mass_count
+
+    # ========== Combine species based on selection ==========
+    # Determine which species to process
     if species == "all":
-        flux_map = np.zeros((n_lat, n_lon))
-        v_r_num = np.zeros((n_lat, n_lon))
-        v_r_den = np.zeros((n_lat, n_lon))
-        count_map = np.zeros((n_lat, n_lon))
-        n_shell_map = np.zeros((n_lat, n_lon))
-
-        for spec_id in range(len(sim_ppc)):
-            F_s, v_r_s, C_s, n_s = process_species(spec_id)
-            flux_map += F_s
-            count_map += C_s
-            n_shell_map += n_s
-
-            # Density-weighted combination of v_r over species [km/s]:
-            # Weight by shell density n_s [m^-3] in each bin
-            v_r_num += v_r_s * n_s
-            v_r_den += n_s
-
-        v_r_map = np.zeros_like(flux_map)
-        mask = v_r_den > 1e3  # [m^-3] floor
-        v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
-
-    else:
+        spec_ids = list(range(len(sim_ppc)))
+    elif species == "protons":
         if "Base" in all_particles_filename:
-            spec_id = 0 if species == "protons" else 2
-            flux_map, v_r_map, count_map, n_shell_map = process_species(spec_id)
+            spec_ids = [0]  # Single proton species
         elif "HNHV" in all_particles_filename:
-            if species == "protons":
-                flux_map = np.zeros((n_lat, n_lon))
-                v_r_num = np.zeros((n_lat, n_lon))
-                v_r_den = np.zeros((n_lat, n_lon))
-                count_map = np.zeros((n_lat, n_lon))
-                n_shell_map = np.zeros((n_lat, n_lon))
+            spec_ids = [0, 1]  # Two proton species
+        else:
+            raise ValueError(f"Unknown case: {all_particles_filename}")
+    elif species == "alphas":
+        if "Base" in all_particles_filename:
+            spec_ids = [2]  # Single alpha species
+        elif "HNHV" in all_particles_filename:
+            spec_ids = [2, 3]  # Two alpha species
+        else:
+            raise ValueError(f"Unknown case: {all_particles_filename}")
+    else:
+        raise ValueError(f"Unknown species: {species}")
 
-                for spec_id in [0, 1]:
-                    F_s, v_r_s, C_s, n_s = process_species(spec_id)
-                    flux_map += F_s
-                    count_map += C_s
-                    n_shell_map += n_s
+    # Initialize accumulator maps
+    macro_count_total = np.zeros((n_lat, n_lon))  # [# macroparticles]
+    count_map_total = np.zeros((n_lat, n_lon))  # [# physical particles]
+    flux_contrib_total = np.zeros((n_lat, n_lon))  # [# particles * m/s]
+    momentum_total = np.zeros((n_lat, n_lon))  # [amu * # particles * m/s]
+    mass_count_total = np.zeros((n_lat, n_lon))  # [amu * # particles]
 
-                    # Density-weighted combination of v_r over species [km/s]:
-                    # Weight by shell density n_s [m^-3] in each bin
-                    v_r_num += v_r_s * n_s
-                    v_r_den += n_s
+    # Process each species and accumulate
+    for spec_id in spec_ids:
+        macro_count, count, flux_contrib, momentum, mass_count = process_species(spec_id)
+        macro_count_total += macro_count
+        count_map_total += count
+        flux_contrib_total += flux_contrib
+        momentum_total += momentum
+        mass_count_total += mass_count
 
-                v_r_map = np.zeros_like(flux_map)
-                mask = v_r_den > 1e3  # [m^-3] floor
-                v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
-            elif species == "alphas":
-                flux_map = np.zeros((n_lat, n_lon))
-                v_r_num = np.zeros((n_lat, n_lon))
-                v_r_den = np.zeros((n_lat, n_lon))
-                count_map = np.zeros((n_lat, n_lon))
-                n_shell_map = np.zeros((n_lat, n_lon))
+    # ========== Compute final quantities ==========
 
-                for spec_id in [2, 3]:
-                    F_s, v_r_s, C_s, n_s = process_species(spec_id)
-                    flux_map += F_s
-                    count_map += C_s
-                    n_shell_map += n_s
+    # 1) Shell volume density [m^-3] → [cm^-3]
+    # Use physical particle count, not macroparticles
+    den_map = np.where(shell_volume > 0, count_map_total / shell_volume, 0.0)  # [m^-3]
+    den_map_cm3 = den_map * 1e-6  # [cm^-3]
 
-                    # Density-weighted combination of v_r over species [km/s]:
-                    # Weight by shell density n_s [m^-3] in each bin
-                    v_r_num += v_r_s * n_s
-                    v_r_den += n_s
+    # 2) Surface flux [cm^-2 s^-1]
+    # Flux = Σ(w_i * |v_r,i|) / area
+    flux_map = np.where(area > 0, flux_contrib_total / area, 0.0)  # [m^-2 s^-1]
+    flux_map_cm = flux_map * 1e-4  # [cm^-2 s^-1]
 
-                v_r_map = np.zeros_like(flux_map)
-                mask = v_r_den > 1e3  # [m^-3] floor
-                v_r_map[mask] = v_r_num[mask] / v_r_den[mask]
+    # 3) Mass-weighted average velocity [km/s]
+    # v_avg = Σ(m * w_i * v_r,i) / Σ(m * w_i)
+    v_r_map = np.zeros((n_lat, n_lon))
+    mass_threshold = 1e10  # [amu * # particles] minimum for statistics
+    valid_mask = mass_count_total > mass_threshold
+    v_r_map[valid_mask] = (momentum_total[valid_mask] /
+                           mass_count_total[valid_mask]) * 1e-3  # [km/s]
 
-    # Convert flux to [cm^-2 s^-1]
-    flux_map_cm = flux_map * 1e-4  # [m^-2 s^-1] → [cm^-2 s^-1]
+    # Clip unphysical values (should not occur)
+    v_r_map = np.clip(v_r_map, -3000, 0)
 
-    # DEBUG OUTPUT STATISTICS
+    # ========== Debug output ==========
     print("=" * 60)
     print("FINAL MAPS STATISTICS")
     print("=" * 60)
-    print(f"n_shell_map: [{np.nanmin(n_shell_map):.2e}, {np.nanmax(n_shell_map):.2e}] m^-3")
-    print(f"             [{np.nanmin(n_shell_map)*1e-6:.2e}, {np.nanmax(n_shell_map)*1e-6:.2e}] cm^-3")
-    print(f"flux_map_cm: [{np.nanmin(flux_map_cm):.2e}, {np.nanmax(flux_map_cm):.2e}] cm^-2 s^-1")
-    print(f"v_r_map:     [{np.nanmin(v_r_map):.2f}, {np.nanmax(v_r_map):.2f}] km/s")
+    print(f"Total physical particles: {count_map_total.sum():.2e}")
+    print(f"den_map_cm3: [{den_map_cm3[den_map_cm3 > 0].min():.2e}, {den_map_cm3.max():.2e}] cm^-3")
+    print(f"flux_map_cm: [{flux_map_cm[flux_map_cm > 0].min():.2e}, {flux_map_cm.max():.2e}] cm^-2 s^-1")
+    print(f"v_r_map:     [{v_r_map[valid_mask].min():.2f}, {v_r_map[valid_mask].max():.2f}] km/s")
     print("=" * 60 + "\n")
 
-    return flux_map_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map
+    return flux_map_cm, lat_centers, lon_centers, v_r_map, macro_count_total, den_map_cm3
 
 
 def compute_flux_statistics(flux_map, lat_centers, lon_centers, R_M,
