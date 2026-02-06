@@ -46,6 +46,7 @@ obsDict = {'time': 0,
 print("Loading AMITIS observer data...")
 amitis_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/concat_obs"
 amitis = amitis_observer(amitis_path, f"Observer_{case}")
+# amitis.collect_all_data()
 
 observers, probes, obsDict_loaded, numFields = amitis.load_collected_data()
 
