@@ -6,29 +6,39 @@ import numpy as np
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPS_HNHV"
-post_icme = False
+case = "CPS_Base"
 
+dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
+
+# Flags for what time range to use (also defines input and output paths)
+transient = False
+post_transient = False
+new_state = False
+
+# take 20 seconds for each case
 if "Base" in case:
     folder = Path(f"/Volumes/data_backup/mercury/extreme/{case}/05/subset/")
     outdir = f"/Volumes/data_backup/mercury/extreme/{case}/05/particles/"
+    sim_steps = list(range(105000, 115000 + 1, 1000))
 elif "HNHV" in case:
-    if post_icme:
-        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/subset/")
-        outdir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/particles/"
-    else:
+    if transient and not post_transient and not new_state:
         folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/subset/")
         outdir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/particles/"
-os.makedirs(outdir, exist_ok=True)
-
-# take last 15-ish seconds
-if "Base" in case:
-    sim_steps = list(range(100000, 115000 + 1, 1000))
-elif "HNHV" in case:
-    if post_icme:
-        sim_steps = range(170000, 180000 + 1, 1000)  # post-sheath
+        sim_steps = range(140000, 150000 + 1, 1000)  # transient
+    elif post_transient and not transient and not new_state:
+        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/03/subset/")
+        outdir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/03/particles/"
+        sim_steps = range(165000, 175000 + 1, 1000)  # post-transient
+    elif new_state and not transient and not post_transient:
+        folder = Path(f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/subset/")
+        outdir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/particles/"
+        sim_steps = range(340000, 350000 + 1, 1000)  # end of simulation
     else:
-        sim_steps = range(140000, 150000 + 1, 1000)  # sheath
+        raise ValueError("Too many flags! Set only one of transient, post_transient, or new_state to True")
+else:
+    raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
+
+os.makedirs(outdir, exist_ok=True)
 
 # Initialize cached coordinates
 x = y = z = None
@@ -36,15 +46,11 @@ x = y = z = None
 for sim_step in sim_steps:
     prefix = f"Subset_{case}_{sim_step}"
 
-    # -----------------------------
     # Load all NPZ chunks with memory mapping
-    # -----------------------------
     npz_files = sorted(folder.glob(f"{prefix}*.npz"))
     loaded = [np.load(f, mmap_mode="r") for f in npz_files]
 
-    # -----------------------------
     # Compute global domain extents
-    # -----------------------------
     xmin = min(d["xmin"][0] for d in loaded)
     xmax = max(d["xmax"][0] for d in loaded)
     ymin = min(d["ymin"][0] for d in loaded)
@@ -72,9 +78,7 @@ for sim_step in sim_steps:
         y = np.linspace(ymin, ymax, NY)
         z = np.linspace(zmin, zmax, NZ)
 
-    # -----------------------------
     # Preallocate combined particle arrays
-    # -----------------------------
     counts = [d["rx"].size for d in loaded]
     n_particles = sum(counts)
 
@@ -99,15 +103,11 @@ for sim_step in sim_steps:
 
     print("Total particles:", n_particles)
 
-    # -----------------------------
     # Time coordinate
-    # -----------------------------
-    time_value = sim_step * 0.002
+    time_value = sim_step * dt
     time = np.array([time_value], dtype=np.float32)
 
-    # -----------------------------
     # Save concatenated output to NPZ
-    # -----------------------------
     outfile_npz = os.path.join(outdir, f"{prefix}_full_domain.npz")
 
     np.savez_compressed(
@@ -142,9 +142,7 @@ for sim_step in sim_steps:
 
     print(f"NPZ saved: {outfile_npz}")
 
-    # -----------------------------
     # Clear memory
-    # -----------------------------
     del rx, ry, rz, vx, vy, vz, sid, time
     for d in loaded:
         d.close()  # Close memory-mapped npz

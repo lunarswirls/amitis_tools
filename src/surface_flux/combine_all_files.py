@@ -9,15 +9,20 @@ from pyamitis.amitis_particle import *
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
 case = "CPS_HNHV"
+
+# DOUBLE CHECK ONLY ONE IS TRUE!!!!
+transient = False
 post_icme = False
 
 if "Base" in case:
     main_path = f"/Volumes/data_backup/mercury/extreme/{case}/05/"
 elif "HNHV" in case:
-    if post_icme:
+    if transient and not post_icme:
+        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/"
+    elif post_icme and not transient:  # TODO: check what folder is correct here
         main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
     else:
-        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/"
+        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
 
 select_R = 2480.e3
 
@@ -27,7 +32,7 @@ sub_filename = f'Subset_{case}'
 all_particles_directory = main_path + 'precipitation/'
 os.makedirs(all_particles_directory, exist_ok=True)
 
-all_particles_filename = all_particles_directory + "all_particles_at_surface.npz"
+all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
 subset_filelist = np.array(sorted(glob.glob(sub_filepath + sub_filename + "*.npz")))
 subset_filelist = np.unique([f[:-9] for f in subset_filelist])
