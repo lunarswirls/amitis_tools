@@ -193,7 +193,7 @@ for case in cases:
         (den_cm3, (1, 140), "cividis", r"$n$ [cm$^{-3}$]"),
         (vr_abs, (1, 250), "plasma", r"$|v_r|$ [km/s]"),
         (flux_abs, (0.05e9, 1.e13), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
-        (mass_flux_abs, (np.nanmin(mass_flux_abs), 4.e13), "hot", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
+        (mass_flux_abs, (np.nanmin(mass_flux_abs), 4.e13), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
         (energy_flux_abs, (np.nanmin(energy_flux_abs), 1.e16), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
     ]
 
@@ -202,7 +202,7 @@ for case in cases:
         (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "cividis", r"log$_{10}$($n$) [cm$^{-3}$]"),
         (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "plasma", r"log$_{10}$($|v_r|$) [km s$^{-1}$]"),
         (log_flx, (np.nanmin(log_flx), np.nanmax(log_flx)), "jet", r"log$_{10}$($F_r$) [cm$^{-2}$ s$^{-1}$]"),
-        (log_mass_flux, (np.nanmin(log_mass_flux), np.nanmax(log_mass_flux)), "hot", r"log$_{10}$($F_{mass}$) [amu cm$^{-2}$ s$^{-1}$]"),
+        (log_mass_flux, (np.nanmin(log_mass_flux), np.nanmax(log_mass_flux)), "copper", r"log$_{10}$($F_{mass}$) [amu cm$^{-2}$ s$^{-1}$]"),
         (log_energy_flux, (np.nanmin(log_energy_flux), np.nanmax(log_energy_flux)), "inferno", r"log$_{10}$($F_{energy}$) [eV cm$^{-2}$ s$^{-1}$]")
     ]
 
@@ -211,7 +211,7 @@ for case in cases:
         (log_den_norm, (-1, 1), "cividis", r"log$_{10}$($n/n_0$)"),
         (log_vel_norm, (-1.0, 0.0), "plasma", r"log$_{10}$($|v_r|/v_0$)"),
         (log_flx_norm, (0, 4), "jet", r"log$_{10}$($F_r/F_0$)"),
-        (log_mass_flux_norm, (0, 4), "hot", r"log$_{10}$($F_{mass}/F_{mass,0}$)"),
+        (log_mass_flux_norm, (0, 5), "winter", r"log$_{10}$($F_{mass}/F_{mass,0}$)"),
         (log_energy_flux_norm, (0, 4), "inferno", r"log$_{10}$($F_{energy}/F_{energy,0}$)")
     ]
 

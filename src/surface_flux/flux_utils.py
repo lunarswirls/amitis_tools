@@ -736,8 +736,8 @@ def create_comparison_table(stats_list, output_csv='flux_statistics_comparison.c
         case = row['case_name']
         total_flux = format_sci_latex(row['total_integrated_flux'])
         peak_flux = format_sci_latex(row['peak_flux_value'])  # in scientific notation
-        peak_lat = f"{row['peak_flux_lat']:.0f}"
-        peak_lon = f"{row['peak_flux_lon']:.0f}"
+        peak_lat = f"{row['peak_flux_lat']:.1f}"
+        peak_lon = f"{row['peak_flux_lon']:.1f}"
         precip_pct = f"{row['spatial_extent_percentage']:.2f}"
         ns_ratio = f"{row['hemispheric_asymmetry_ratio']:.2f}" if row['hemispheric_asymmetry_ratio'] != np.inf else '$\\infty$'
         dn_ratio = f"{row['dayside_nightside_ratio']:.2f}" if row['dayside_nightside_ratio'] != np.inf else '$\\infty$'

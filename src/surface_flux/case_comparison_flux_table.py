@@ -25,8 +25,8 @@ select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface f
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/"
 
-cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
-# cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
+# cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
+cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
 
 # DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False
