@@ -6,8 +6,8 @@ import pandas as pd
 
 
 def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
-                        sim_ppc, sim_den, spec_map, R_M, select_R,
-                        species="all", n_lat=180, n_lon=360):
+                        sim_ppc, sim_den, spec_map, species_mass, species_charge,
+                        R_M, select_R, species="all", n_lat=180, n_lon=360, debug=False):
     """
     Compute particle counts, density, radial velocity, and surface flux in
     spherical coordinates for particles impacting the surface at r = R_M.
@@ -24,6 +24,10 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         Physical number density per species in the upstream region [m^-3].
     spec_map : array-like
         Name of each species.
+    species_mass : array-like
+        Mass of each species [amu].
+    species_charge : array-like
+        Charge of each species [e].
     R_M : float
         Planet radius [m].
     select_R : float
@@ -32,6 +36,8 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         Which species to use.
     n_lat, n_lon : int
         Number of latitude and longitude bins.
+    debug : bool
+        Flag to print debugging statements.
 
     Returns
     -------
@@ -47,7 +53,15 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         Physical particle count in shell [# particles].
     den_map_cm3 : ndarray (n_lat, n_lon)
         Shell volume-averaged number density [cm^-3].
+    mass_flux_map : ndarray (n_lat, n_lon)
+        Mass flux [amu cm^-2 s^-1].
+    energy_flux_map : ndarray (n_lat, n_lon)
+        Energy flux [eV cm^-2 s^-1].
     """
+
+    # Constants
+    AMU_TO_KG = 1.66053906660e-27  # [kg/amu]
+    J_TO_EV = 6.241509074e18  # [eV/J]
 
     # ========== Load particle data ==========
     with np.load(all_particles_filename) as data:
@@ -66,10 +80,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
     sim_ppc = np.asarray(sim_ppc, dtype=float)
     sim_den = np.asarray(sim_den, dtype=float)
-
-    # Species properties (adjust to match your spec_map ordering)
-    species_mass = np.array([1.0, 1.0, 4.0, 4.0])  # [amu]
-    species_charge = np.array([1.0, 1.0, 2.0, 2.0])  # [e]
+    species_mass = np.asarray(species_mass, dtype=float)
 
     # ========== Geometric setup ==========
     # Angular binning
@@ -99,8 +110,9 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         macro_count_map : Macroparticle count in shell [# macroparticles]
         count_map : Physical particle count in shell [# particles]
         flux_contribution : Flux contribution Σ(w_i * |v_r,i|) [# particles * m/s]
-        momentum_contribution : Mass-weighted momentum Σ(m * w_i * v_r,i) [amu * # particles * m/s]
         mass_count : Mass-weighted count Σ(m * w_i) [amu * # particles]
+        mass_flux_contribution : Mass flux contribution Σ(m * w_i * |v_r,i|) [amu * # particles * m/s]
+        energy_flux_contribution : Energy flux contribution Σ(w_i * KE_i * |v_r,i|) [J * # particles * m/s]
         """
         print(f"Processing species {spec_map[spec_id]}")
 
@@ -113,7 +125,13 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         pvy_s = pvy[mask]
         pvz_s = pvz[mask]
 
-        print(f"  Initial macroparticles: {len(prx_s)}")
+        if debug:
+            print(f"  Initial macroparticles: {len(prx_s)}")
+
+        if len(prx_s) == 0:
+            print(f"No particles matching  {spec_map[spec_id]}! Returning empty map.")
+            empty = np.zeros((n_lat, n_lon))
+            return empty, empty, empty, empty, empty, empty
 
         # ========== 2) Shell selection: R_M <= r <= select_R ==========
         r = np.sqrt(prx_s ** 2 + pry_s ** 2 + prz_s ** 2)  # [m]
@@ -127,11 +145,13 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         pvz_s = pvz_s[shell_mask]
         r = r[shell_mask]
 
-        print(f"  After shell selection: {len(r)}")
+        if debug:
+            print(f"  After shell selection: {len(r)}")
 
         if len(r) == 0:
+            print(f"No particles with r <= {select_R}! Returning empty map.")
             empty = np.zeros((n_lat, n_lon))
-            return empty, empty, empty, empty, empty
+            return empty, empty, empty, empty, empty, empty
 
         # ========== 3) Compute radial velocity ==========
         r_hat_x = prx_s / r
@@ -150,12 +170,14 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         pvz_s = pvz_s[inward_mask]
         v_r = v_r[inward_mask]
 
-        print(f"  After inward selection: {len(v_r)}")
-        print(f"  v_r range: [{v_r.min():.2e}, {v_r.max():.2e}] m/s")
+        if debug:
+            print(f"  After inward selection: {len(v_r)}")
+            print(f"  v_r range: [{v_r.min():.2e}, {v_r.max():.2e}] m/s")
 
         if len(v_r) == 0:
+            print(f"No particles with inward radial velocity! Returning empty map.")
             empty = np.zeros((n_lat, n_lon))
-            return empty, empty, empty, empty, empty
+            return empty, empty, empty, empty, empty, empty
 
         # ========== 5) Ray-sphere intersection to find surface impact points ==========
         r_vec = np.column_stack([prx_s, pry_s, prz_s])  # [m] shape (N, 3)
@@ -169,11 +191,13 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         disc = b ** 2 - 4 * a * c
         valid_intersection = disc > 0.0
 
-        print(f"  After intersection check: {valid_intersection.sum()}")
+        if debug:
+            print(f"  After intersection check: {valid_intersection.sum()}")
 
         if valid_intersection.sum() == 0:
+            print(f"No particles with intersecting trajectories! Returning empty map.")
             empty = np.zeros((n_lat, n_lon))
-            return empty, empty, empty, empty, empty
+            return empty, empty, empty, empty, empty, empty
 
         # Apply intersection filter
         r_vec = r_vec[valid_intersection]
@@ -196,16 +220,41 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         lon_impact = np.degrees(np.arctan2(y_impact, x_impact))  # [-180, 180] deg
         lat_impact = np.degrees(np.arcsin(z_impact / R_M))  # [-90, 90] deg
 
-        # ========== 7) Compute physical weights ==========
+        if debug:
+            # Debug: Check impact position distribution
+            print(f"\nDEBUG: Impact position statistics for {spec_map[spec_id]}")
+            print(f"  x_impact range: [{x_impact.min():.2e}, {x_impact.max():.2e}] m")
+            print(f"  y_impact range: [{y_impact.min():.2e}, {y_impact.max():.2e}] m")
+            print(f"  z_impact range: [{z_impact.min():.2e}, {z_impact.max():.2e}] m")
+            print(f"  lon_impact range: [{lon_impact.min():.1f}, {lon_impact.max():.1f}]°")
+            print(f"  lat_impact range: [{lat_impact.min():.1f}, {lat_impact.max():.1f}]°")
+
+            # Check where most flux is
+            hist_lon, bins_lon = np.histogram(lon_impact, bins=36, range=(-180, 180))
+            peak_lon_bin = np.argmax(hist_lon)
+            peak_lon_center = (bins_lon[peak_lon_bin] + bins_lon[peak_lon_bin + 1]) / 2
+            print(f"  Most particles near lon = {peak_lon_center:.1f}°")
+
+        # ========== 7) Compute physical weights and energetics ==========
         # Each macroparticle represents w physical particles
         cell_volume = sim_dx * sim_dy * sim_dz  # [m^3]
         w = (sim_den[spec_id] * cell_volume) / (sim_ppc[spec_id] * num_files)  # [# particles]
 
         weights = w * np.ones(len(lat_impact))  # [# particles per macroparticle]
 
-        print(f"  Macroparticle weight: {w:.2e} physical particles")
-        print(f"  Total macroparticles: {len(lat_impact)}")
-        print(f"  Total physical particles: {weights.sum():.2e}\n")
+        # Mass and velocity properties
+        m = species_mass[spec_id]  # [amu]
+        v_squared = np.sum(v_vec ** 2, axis=1)  # [m^2/s^2]
+        v_r_mag = -v_r  # [m/s] magnitude (v_r is negative)
+
+        # Kinetic energy per particle [J]
+        KE_per_particle = 0.5 * m * AMU_TO_KG * v_squared  # [J]
+
+        if debug:
+            print(f"  Macroparticle weight: {w:.2e} physical particles")
+            print(f"  Total macroparticles: {len(lat_impact)}")
+            print(f"  Total physical particles: {weights.sum():.2e}")
+            print(f"  Energy range: [{KE_per_particle.min() * J_TO_EV:.2e}, {KE_per_particle.max() * J_TO_EV:.2e}] eV\n")
 
         # ========== 8) Histogram onto surface bins ==========
         # Macroparticle count: number of simulation macroparticles
@@ -222,32 +271,35 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
             weights=weights  # [# particles]
         )
 
-        # Flux contribution: Σ(w_i * |v_r,i|) for computing flux
-        # Note: v_r is negative, so use -v_r for magnitude
+        # Number flux contribution: Σ(w_i * |v_r,i|)
         flux_contribution, _, _ = np.histogram2d(
             lat_impact, lon_impact,
             bins=[lat_edges, lon_edges],
-            weights=weights * (-v_r)  # [# particles * m/s]
+            weights=weights * v_r_mag  # [# particles * m/s]
         )
 
-        # For velocity: need mass-weighted sums
-        m = species_mass[spec_id]  # [amu]
-
-        # Mass-weighted momentum: Σ(m * w_i * v_r,i)
-        momentum_contribution, _, _ = np.histogram2d(
-            lat_impact, lon_impact,
-            bins=[lat_edges, lon_edges],
-            weights=m * weights * v_r  # [amu * # particles * m/s]
-        )
-
-        # Mass-weighted count: Σ(m * w_i)
+        # Mass-weighted count: Σ(m * w_i) - for velocity calculation
         mass_count, _, _ = np.histogram2d(
             lat_impact, lon_impact,
             bins=[lat_edges, lon_edges],
             weights=m * weights  # [amu * # particles]
         )
 
-        return macro_count_map, count_map, flux_contribution, momentum_contribution, mass_count
+        # Mass flux contribution: Σ(m * w_i * |v_r,i|)
+        mass_flux_contribution, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
+            weights=m * weights * v_r_mag  # [amu * # particles * m/s]
+        )
+
+        # Energy flux contribution: Σ(w_i * KE_i * |v_r,i|)
+        energy_flux_contribution, _, _ = np.histogram2d(
+            lat_impact, lon_impact,
+            bins=[lat_edges, lon_edges],
+            weights=weights * KE_per_particle * v_r_mag  # [J * # particles * m/s]
+        )
+
+        return macro_count_map, count_map, flux_contribution, mass_count, mass_flux_contribution, energy_flux_contribution
 
     # ========== Combine species based on selection ==========
     # Determine which species to process
@@ -274,22 +326,24 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     macro_count_total = np.zeros((n_lat, n_lon))  # [# macroparticles]
     count_map_total = np.zeros((n_lat, n_lon))  # [# physical particles]
     flux_contrib_total = np.zeros((n_lat, n_lon))  # [# particles * m/s]
-    momentum_total = np.zeros((n_lat, n_lon))  # [amu * # particles * m/s]
     mass_count_total = np.zeros((n_lat, n_lon))  # [amu * # particles]
+    mass_flux_total = np.zeros((n_lat, n_lon))  # [amu * # particles * m/s]
+    energy_flux_total = np.zeros((n_lat, n_lon))  # [J * # particles * m/s]
 
     # Process each species and accumulate
     for spec_id in spec_ids:
-        macro_count, count, flux_contrib, momentum, mass_count = process_species(spec_id)
+        macro_count, count, flux_contrib, mass_count, mass_flux_contrib, energy_flux_contrib = process_species(spec_id)
         macro_count_total += macro_count
         count_map_total += count
         flux_contrib_total += flux_contrib
-        momentum_total += momentum
         mass_count_total += mass_count
+        mass_flux_total += mass_flux_contrib
+        energy_flux_total += energy_flux_contrib
 
     # ========== Compute final quantities ==========
 
     # 1) Shell volume density [m^-3] → [cm^-3]
-    # Use physical particle count, not macroparticles
+    # Use physical particle counts
     den_map = np.where(shell_volume > 0, count_map_total / shell_volume, 0.0)  # [m^-3]
     den_map_cm3 = den_map * 1e-6  # [cm^-3]
 
@@ -299,31 +353,40 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     flux_map_cm = flux_map * 1e-4  # [cm^-2 s^-1]
 
     # 3) Mass-weighted average velocity [km/s]
-    # v_avg = Σ(m * w_i * v_r,i) / Σ(m * w_i)
+    # v_avg = (mass_flux / mass_count) because mass_flux = Σ(m*w*v) and mass_count = Σ(m*w)
     v_r_map = np.zeros((n_lat, n_lon))
     mass_threshold = 1e10  # [amu * # particles] minimum for statistics
     valid_mask = mass_count_total > mass_threshold
-    v_r_map[valid_mask] = (momentum_total[valid_mask] /
-                           mass_count_total[valid_mask]) * 1e-3  # [km/s]
+    v_r_map[valid_mask] = -(mass_flux_total[valid_mask] / mass_count_total[valid_mask]) * 1e-3  # [km/s], negative for inward
 
-    # Clip unphysical values (should not occur)
-    v_r_map = np.clip(v_r_map, -3000, 0)
+    # 4) Mass flux [amu cm^-2 s^-1]
+    # Mass flux = Σ(m * w_i * |v_r,i|) / area
+    mass_flux_map = np.where(area > 0, mass_flux_total / area, 0.0)  # [amu * # particles * m/s / m^2]
+    mass_flux_map = mass_flux_map * 1e-4  # [amu cm^-2 s^-1]
 
-    # ========== Debug output ==========
-    print("=" * 60)
-    print("FINAL MAPS STATISTICS")
-    print("=" * 60)
-    print(f"Total physical particles: {count_map_total.sum():.2e}")
-    print(f"den_map_cm3: [{den_map_cm3[den_map_cm3 > 0].min():.2e}, {den_map_cm3.max():.2e}] cm^-3")
-    print(f"flux_map_cm: [{flux_map_cm[flux_map_cm > 0].min():.2e}, {flux_map_cm.max():.2e}] cm^-2 s^-1")
-    print(f"v_r_map:     [{v_r_map[valid_mask].min():.2f}, {v_r_map[valid_mask].max():.2f}] km/s")
-    print("=" * 60 + "\n")
+    # 5) Energy flux [eV cm^-2 s^-1]
+    # Energy flux = Σ(w_i * KE_i * |v_r,i|) / area
+    energy_flux_map_SI = np.where(area > 0, energy_flux_total / area, 0.0)  # [J * # particles * m/s / m^2] = [W/m^2]
+    energy_flux_map = energy_flux_map_SI * J_TO_EV * 1e-4  # [eV cm^-2 s^-1]
 
-    return flux_map_cm, lat_centers, lon_centers, v_r_map, macro_count_total, den_map_cm3
+    if debug:
+        # ========== Debug output ==========
+        print("=" * 60)
+        print("FINAL MAPS STATISTICS")
+        print("=" * 60)
+        print(f"Total physical particles: {count_map_total.sum():.2e}")
+        print(f"den_map_cm3:     [{den_map_cm3[den_map_cm3 > 0].min():.2e}, {den_map_cm3.max():.2e}] cm^-3")
+        print(f"flux_map_cm:     [{flux_map_cm[flux_map_cm > 0].min():.2e}, {flux_map_cm.max():.2e}] cm^-2 s^-1")
+        print(f"v_r_map:         [{v_r_map[valid_mask].min():.2f}, {v_r_map[valid_mask].max():.2f}] km/s")
+        print(f"mass_flux_map:   [{mass_flux_map[mass_flux_map > 0].min():.2e}, {mass_flux_map.max():.2e}] amu cm^-2 s^-1")
+        print(f"energy_flux_map: [{energy_flux_map[energy_flux_map > 0].min():.2e}, {energy_flux_map.max():.2e}] eV cm^-2 s^-1")
+        print("=" * 60 + "\n")
+
+    return flux_map_cm, lat_centers, lon_centers, v_r_map, macro_count_total, den_map_cm3, mass_flux_map, energy_flux_map
 
 
 def compute_flux_statistics(flux_map, lat_centers, lon_centers, R_M,
-                            flux_threshold=None, case_name="Case"):
+                            flux_threshold=None, case_name="Case", debug=False):
     """
     Compute summary statistics for a georeferenced flux map.
 
@@ -339,14 +402,21 @@ def compute_flux_statistics(flux_map, lat_centers, lon_centers, R_M,
         Planet radius [m]
     flux_threshold : float, optional
         Threshold flux value for spatial extent calculation [cm^-2 s^-1]
-        If None, uses 10% of peak flux
+        If None, uses 0.1% of peak flux
     case_name : str
         Identifier for this case
+    debug : bool
+        Enable debug output
 
     Returns
     -------
     stats : dict
         Dictionary containing computed statistics
+
+    Notes
+    -----
+    Assumes MSO coordinate system: +X toward Sun (subsolar at lon=0°)
+    Dayside/nightside uses proper spherical geometry (Sun above/below horizon)
     """
 
     # Initialize statistics dictionary
@@ -373,98 +443,152 @@ def compute_flux_statistics(flux_map, lat_centers, lon_centers, R_M,
     if np.all(flux_map == 0) or np.all(np.isnan(flux_map)):
         return stats
 
-    # Compute bin sizes
-    dlat = np.radians(lat_centers[1] - lat_centers[0]) if len(lat_centers) > 1 else 0
-    dlon = np.radians(lon_centers[1] - lon_centers[0]) if len(lon_centers) > 1 else 0
+    # Replace NaN with 0 for integration
+    flux_map_clean = np.nan_to_num(flux_map, nan=0.0)
 
-    # Compute area of each bin [m^2]
+    # Compute bin edges from centers
+    n_lat = len(lat_centers)
+    n_lon = len(lon_centers)
+
+    dlat = lat_centers[1] - lat_centers[0] if n_lat > 1 else 1.0
+    dlon = lon_centers[1] - lon_centers[0] if n_lon > 1 else 1.0
+
+    # Reconstruct edges
+    lat_edges = np.linspace(lat_centers[0] - dlat / 2, lat_centers[-1] + dlat / 2, n_lat + 1)
+    lon_edges = np.linspace(lon_centers[0] - dlon / 2, lon_centers[-1] + dlon / 2, n_lon + 1)
+
+    # Convert to radians
+    lat_edges_rad = np.radians(lat_edges)
+    lon_edges_rad = np.radians(lon_edges)
+
+    # Compute dlon in radians
+    dlon_rad = lon_edges_rad[1] - lon_edges_rad[0]
+
+    # Compute area per bin [m^2]
     # A = R^2 * dlon * (sin(lat_upper) - sin(lat_lower))
-    lat_edges_rad = np.linspace(np.radians(-90), np.radians(90), len(lat_centers) + 1)
-    dlon_rad = dlon
+    area_per_bin = np.zeros((n_lat, n_lon))
 
-    area_per_bin = np.zeros((len(lat_centers), len(lon_centers)))
-    for i in range(len(lat_centers)):
-        area_i = R_M ** 2 * dlon_rad * (np.sin(lat_edges_rad[i + 1]) - np.sin(lat_edges_rad[i]))
-        area_per_bin[i, :] = area_i  # Same area for all longitudes at this latitude
+    for i in range(n_lat):
+        sin_upper = np.sin(lat_edges_rad[i + 1])
+        sin_lower = np.sin(lat_edges_rad[i])
+        area_lat = R_M ** 2 * dlon_rad * (sin_upper - sin_lower)
+        area_per_bin[i, :] = area_lat
+
+    if debug:
+        print(f"\n{'=' * 60}")
+        print(f"DEBUG: {case_name}")
+        print(f"{'=' * 60}")
+        print(f"Grid: {n_lat} lat × {n_lon} lon")
+        print(f"Lat range: [{lat_centers[0]:.1f}, {lat_centers[-1]:.1f}]°")
+        print(f"Lon range: [{lon_centers[0]:.1f}, {lon_centers[-1]:.1f}]°")
+        print(f"Total computed area: {np.sum(area_per_bin):.3e} m²")
+        print(f"Expected sphere area: {4 * np.pi * R_M ** 2:.3e} m²")
+        print(f"Coverage: {100 * np.sum(area_per_bin) / (4 * np.pi * R_M ** 2):.1f}%")
 
     # Convert flux from cm^-2 s^-1 to m^-2 s^-1 for integration
-    flux_map_si = flux_map * 1e4  # cm^-2 s^-1 -> m^-2 s^-1
+    flux_map_si = flux_map_clean * 1e4
 
     # Total integrated flux [particles/s]
-    # Integrate flux * area over entire surface
-    total_flux = np.nansum(flux_map_si * area_per_bin)  # [particles/s]
+    total_flux = np.sum(flux_map_si * area_per_bin)
     stats['total_integrated_flux'] = total_flux
 
     # Peak flux and location
     peak_idx = np.unravel_index(np.nanargmax(flux_map), flux_map.shape)
-    stats['peak_flux_value'] = flux_map[peak_idx]  # [cm^-2 s^-1]
-    stats['peak_flux_lat'] = lat_centers[peak_idx[0]]  # [deg]
-    stats['peak_flux_lon'] = lon_centers[peak_idx[1]]  # [deg]
+    stats['peak_flux_value'] = flux_map[peak_idx]
+    stats['peak_flux_lat'] = lat_centers[peak_idx[0]]
+    stats['peak_flux_lon'] = lon_centers[peak_idx[1]]
 
     # Spatial extent above threshold
     if flux_threshold is None:
-        flux_threshold = 0.1 * stats['peak_flux_value']  # 10% of peak
+        flux_threshold = 0.001 * stats['peak_flux_value']  # 0.1% of peak
     stats['threshold_used'] = flux_threshold
 
-    above_threshold = flux_map >= flux_threshold
-    area_above_threshold = np.sum(area_per_bin[above_threshold])  # [m^2]
-    total_surface_area = 4 * np.pi * R_M ** 2  # [m^2]
+    above_threshold = flux_map_clean >= flux_threshold
+    area_above_threshold = np.sum(area_per_bin[above_threshold])
+    total_surface_area = 4 * np.pi * R_M ** 2
 
-    stats['spatial_extent_area'] = area_above_threshold  # [m^2]
-    stats['spatial_extent_percentage'] = (area_above_threshold / total_surface_area) * 100  # [%]
+    stats['spatial_extent_area'] = area_above_threshold
+    stats['spatial_extent_percentage'] = (area_above_threshold / total_surface_area) * 100
 
-    # Hemispheric asymmetry
+    # Create 2D coordinate grids for lat/lon
+    lat_grid, lon_grid = np.meshgrid(lat_centers, lon_centers, indexing='ij')
+
+    # ========== HEMISPHERIC ASYMMETRY ==========
     # Northern hemisphere: lat >= 0
     # Southern hemisphere: lat < 0
-    northern_mask = lat_centers >= 0
-    southern_mask = lat_centers < 0
 
-    # Create 2D masks
-    northern_2d = northern_mask[:, np.newaxis] * np.ones_like(flux_map)
-    southern_2d = southern_mask[:, np.newaxis] * np.ones_like(flux_map)
+    northern_mask = lat_grid >= 0
+    southern_mask = lat_grid < 0
 
-    northern_flux = np.nansum(flux_map_si[northern_2d.astype(bool)] *
-                              area_per_bin[northern_2d.astype(bool)])
-    southern_flux = np.nansum(flux_map_si[southern_2d.astype(bool)] *
-                              area_per_bin[southern_2d.astype(bool)])
+    northern_flux = np.sum(flux_map_si[northern_mask] * area_per_bin[northern_mask])
+    southern_flux = np.sum(flux_map_si[southern_mask] * area_per_bin[southern_mask])
 
-    stats['northern_hemisphere_flux'] = northern_flux  # [particles/s]
-    stats['southern_hemisphere_flux'] = southern_flux  # [particles/s]
+    if debug:
+        print(f"\nHemisphere split:")
+        print(f"Northern bins: {northern_mask.sum()}")
+        print(f"Southern bins: {southern_mask.sum()}")
+        print(f"Northern flux: {northern_flux:.2e} particles/s")
+        print(f"Southern flux: {southern_flux:.2e} particles/s")
+        print(f"Sum: {northern_flux + southern_flux:.2e} particles/s")
+        print(f"Total: {total_flux:.2e} particles/s")
+
+    stats['northern_hemisphere_flux'] = northern_flux
+    stats['southern_hemisphere_flux'] = southern_flux
 
     if southern_flux > 0:
         stats['hemispheric_asymmetry_ratio'] = northern_flux / southern_flux
     else:
-        stats['hemispheric_asymmetry_ratio'] = np.inf
+        stats['hemispheric_asymmetry_ratio'] = np.inf if northern_flux > 0 else 0.0
 
-    # Dayside vs Nightside
-    # Dayside: -90 < lon < 90 (+X is sunward)
-    # Nightside: lon < -90 or lon > 90
-    dayside_mask = np.abs(lon_centers) < 90
-    nightside_mask = np.abs(lon_centers) >= 90
+    # ========== DAYSIDE VS NIGHTSIDE (PROPER SPHERICAL GEOMETRY) ==========
+    # A point is on dayside if Sun is above its horizon
+    # In MSO: Sun at +X (lon=0°), so check x-component of position vector
 
-    # Create 2D masks
-    dayside_2d = np.ones((len(lat_centers), 1)) * dayside_mask[np.newaxis, :]
-    nightside_2d = np.ones((len(lat_centers), 1)) * nightside_mask[np.newaxis, :]
+    # Convert lat/lon to Cartesian coordinates
+    lat_grid_rad = np.radians(lat_grid)
+    lon_grid_rad = np.radians(lon_grid)
 
-    dayside_flux = np.nansum(flux_map_si[dayside_2d.astype(bool)] *
-                             area_per_bin[dayside_2d.astype(bool)])
-    nightside_flux = np.nansum(flux_map_si[nightside_2d.astype(bool)] *
-                               area_per_bin[nightside_2d.astype(bool)])
+    # Position unit vector x-component: x = cos(lat) * cos(lon)
+    x_grid = np.cos(lat_grid_rad) * np.cos(lon_grid_rad)
 
-    stats['dayside_flux'] = dayside_flux  # [particles/s]
-    stats['nightside_flux'] = nightside_flux  # [particles/s]
+    # Dayside: x > 0 (Sun above horizon)
+    # Nightside: x <= 0 (Sun below horizon)
+    dayside_mask = x_grid > 0
+    nightside_mask = x_grid <= 0
+
+    dayside_flux = np.sum(flux_map_si[dayside_mask] * area_per_bin[dayside_mask])
+    nightside_flux = np.sum(flux_map_si[nightside_mask] * area_per_bin[nightside_mask])
+
+    if debug:
+        print(f"\nDay/Night split (spherical geometry):")
+        print(f"Dayside bins: {dayside_mask.sum()} (x > 0, Sun above horizon)")
+        print(f"Nightside bins: {nightside_mask.sum()} (x <= 0, Sun below horizon)")
+        print(f"Dayside flux: {dayside_flux:.2e} particles/s")
+        print(f"Nightside flux: {nightside_flux:.2e} particles/s")
+        print(f"Sum: {dayside_flux + nightside_flux:.2e} particles/s")
+
+        # Additional debug: check peak location
+        peak_lat = stats['peak_flux_lat']
+        peak_lon = stats['peak_flux_lon']
+        peak_x = np.cos(np.radians(peak_lat)) * np.cos(np.radians(peak_lon))
+        peak_side = "DAYSIDE" if peak_x > 0 else "NIGHTSIDE"
+        print(f"Peak location: lat={peak_lat:.1f}°, lon={peak_lon:.1f}°")
+        print(f"Peak x-component: {peak_x:.3f} → {peak_side}")
+        print(f"{'=' * 60}\n")
+
+    stats['dayside_flux'] = dayside_flux
+    stats['nightside_flux'] = nightside_flux
 
     if nightside_flux > 0:
         stats['dayside_nightside_ratio'] = dayside_flux / nightside_flux
     else:
-        stats['dayside_nightside_ratio'] = np.inf
+        stats['dayside_nightside_ratio'] = np.inf if dayside_flux > 0 else 0.0
 
-    # Mean and median flux
-    # Consider only non-zero flux bins
-    nonzero_flux = flux_map[flux_map > 0]
+    # ========== MEAN AND MEDIAN FLUX ==========
+    nonzero_flux = flux_map_clean[flux_map_clean > 0]
     if len(nonzero_flux) > 0:
-        stats['mean_flux'] = np.nanmean(nonzero_flux)  # [cm^-2 s^-1]
-        stats['median_flux'] = np.nanmedian(nonzero_flux)  # [cm^-2 s^-1]
+        stats['mean_flux'] = np.mean(nonzero_flux)
+        stats['median_flux'] = np.median(nonzero_flux)
 
     return stats
 
@@ -594,15 +718,11 @@ def create_comparison_table(stats_list, output_csv='flux_statistics_comparison.c
 
     # Build LaTeX table manually for better control
     latex_lines = []
-    latex_lines.append("% LaTeX table for flux statistics comparison")
-    latex_lines.append("% Copy this into your document or use \\input{" + output_latex + "}")
-    latex_lines.append("")
     latex_lines.append("\\begin{table}[htbp]")
     latex_lines.append("\\centering")
     latex_lines.append("\\caption{Summary statistics of surface precipitation flux for different simulation cases.}")
     latex_lines.append("\\label{tab:flux_statistics}")
     latex_lines.append("\\begin{tabular}{lccccccc}")
-    latex_lines.append("\\hline")
     latex_lines.append("\\hline")
 
     # Header row
@@ -615,18 +735,14 @@ def create_comparison_table(stats_list, output_csv='flux_statistics_comparison.c
     for _, row in df_latex.iterrows():
         case = row['case_name']
         total_flux = format_sci_latex(row['total_integrated_flux'])
-        peak_flux = format_sci_latex(row['peak_flux_value'])  # Now in scientific notation
-        peak_lat = f"{row['peak_flux_lat']:.1f}"
-        peak_lon = f"{row['peak_flux_lon']:.1f}"
-        precip_pct = f"{row['spatial_extent_percentage']:.1f}"
-        ns_ratio = f"{row['hemispheric_asymmetry_ratio']:.2f}" if row[
-                                                                      'hemispheric_asymmetry_ratio'] != np.inf else '$\\infty$'
+        peak_flux = format_sci_latex(row['peak_flux_value'])  # in scientific notation
+        peak_lat = f"{row['peak_flux_lat']:.0f}"
+        peak_lon = f"{row['peak_flux_lon']:.0f}"
+        precip_pct = f"{row['spatial_extent_percentage']:.2f}"
+        ns_ratio = f"{row['hemispheric_asymmetry_ratio']:.2f}" if row['hemispheric_asymmetry_ratio'] != np.inf else '$\\infty$'
         dn_ratio = f"{row['dayside_nightside_ratio']:.2f}" if row['dayside_nightside_ratio'] != np.inf else '$\\infty$'
+        latex_lines.append(f"{case} & {total_flux} & {peak_flux} & {peak_lat} & {peak_lon} & {precip_pct} & {ns_ratio} & {dn_ratio} \\\\")
 
-        latex_lines.append(
-            f"{case} & {total_flux} & {peak_flux} & {peak_lat} & {peak_lon} & {precip_pct} & {ns_ratio} & {dn_ratio} \\\\")
-
-    latex_lines.append("\\hline")
     latex_lines.append("\\hline")
     latex_lines.append("\\end{tabular}")
     latex_lines.append("\\end{table}")
@@ -649,16 +765,12 @@ def create_comparison_table(stats_list, output_csv='flux_statistics_comparison.c
     output_latex_full = output_latex.replace('.tex', '_full.tex')
 
     latex_full = []
-    latex_full.append("% Full LaTeX table with all flux statistics")
-    latex_full.append("% This table is wide and may require landscape orientation or small font")
-    latex_full.append("")
     latex_full.append("\\begin{table*}[htbp]")
     latex_full.append("\\centering")
     latex_full.append("\\small")  # Use smaller font
     latex_full.append("\\caption{Comprehensive surface precipitation flux statistics for all simulation cases.}")
     latex_full.append("\\label{tab:flux_statistics_full}")
     latex_full.append("\\begin{tabular}{lcccccccc}")
-    latex_full.append("\\hline")
     latex_full.append("\\hline")
     latex_full.append(
         "Case & Total Flux & Peak Flux & Peak Location & Mean Flux & Precip. Area & N Hemi & S Hemi & N/S \\\\")
@@ -675,13 +787,10 @@ def create_comparison_table(stats_list, output_csv='flux_statistics_comparison.c
         precip_pct = f"{row['spatial_extent_percentage']:.1f}"
         n_flux = format_sci_latex(row['northern_hemisphere_flux'])
         s_flux = format_sci_latex(row['southern_hemisphere_flux'])
-        ns_ratio = f"{row['hemispheric_asymmetry_ratio']:.2f}" if row[
-                                                                      'hemispheric_asymmetry_ratio'] != np.inf else '$\\infty$'
+        ns_ratio = f"{row['hemispheric_asymmetry_ratio']:.2f}" if row['hemispheric_asymmetry_ratio'] != np.inf else '$\\infty$'
 
-        latex_full.append(
-            f"{case} & {total_flux} & {peak_flux} & {peak_loc} & {mean_flux} & {precip_pct} & {n_flux} & {s_flux} & {ns_ratio} \\\\")
+        latex_full.append(f"{case} & {total_flux} & {peak_flux} & {peak_loc} & {mean_flux} & {precip_pct} & {n_flux} & {s_flux} & {ns_ratio} \\\\")
 
-    latex_full.append("\\hline")
     latex_full.append("\\hline")
     latex_full.append("\\end{tabular}")
     latex_full.append("\\end{table*}")
