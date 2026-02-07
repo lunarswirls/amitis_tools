@@ -346,7 +346,7 @@ first_species = True
 s_dict = {
     '1': 1.4e5,  # H+ solar wind protons [K]
     '2': 1.4e5,
-    '3': 5.6e5,  # Hot electrons or He++ alphas [K]
+    '3': 5.6e5,  # He++ alphas [K]
     '4': 5.6e5,
 }
 
