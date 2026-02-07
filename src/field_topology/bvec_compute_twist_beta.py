@@ -342,7 +342,7 @@ print("=" * 70)
 
 first_species = True
 
-# Species temperatures from simulation input file
+# Species temperatures from simulation input file - THIS DOESNT WORK :( need to compute temperatures somehow - talk to Eva
 s_dict = {
     '1': 1.4e5,  # H+ solar wind protons [K]
     '2': 1.4e5,
