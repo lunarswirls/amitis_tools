@@ -12,7 +12,7 @@ from pyamitis.amitis_particle import *
 # cases = ["CPN_Base", "RPN_Base", "CPS_Base", "RPS_Base"]
 cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
 
-# DOUBLE CHECK ONLY ONE IS TRUE!!!!
+# FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False
 post_transient = True
 new_state = False

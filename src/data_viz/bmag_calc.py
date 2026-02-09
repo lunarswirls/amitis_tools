@@ -8,8 +8,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import os
 
 # SETTINGS
-input_folder = "/Users/danywaller/Projects/mercury/RPS_Base/object/"
-out_folder = "/Users/danywaller/Projects/mercury/RPS_Base/slice_b_dipole_mag/"
+input_folder = "/Users/danywaller/Projects/mercury/extreme/CPS_Base/object/"
+out_folder = "/Users/danywaller/Projects/mercury/extreme/CPS_Base/slice_b_dipole_mag/"
 os.makedirs(out_folder, exist_ok=True)
 
 # name of variables inside the NetCDF file
@@ -27,7 +27,7 @@ sim_steps = list(range(27000, 115000 + 1, 1000))
 for sim_step in sim_steps:
     filename = 'Base_' + "%06d" % sim_step
 
-    f = input_folder + "Amitis_RPS_" + filename + "_xz_comp.nc"
+    f = input_folder + "Amitis_CPS_" + filename + "_xz_comp.nc"
 
     ds = xr.open_dataset(f)
 
@@ -65,7 +65,7 @@ for sim_step in sim_steps:
     # dBmag_raw = np.sqrt(BXT ** 2 + BYT ** 2 + BZT ** 2) - np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)
     dBmag_raw = np.sqrt((BXT - BX) ** 2 + (BYT - BY) ** 2 + (BZT - BZ) ** 2)  # - np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)
 
-    threshold = 150.0
+    threshold = 1e9
 
     dBx = np.abs(BXT - BX).where(np.abs(BXT - BX) <= threshold, np.nan)
     dBy = np.abs(BYT - BY).where(np.abs(BYT - BY) <= threshold, np.nan)
@@ -83,11 +83,11 @@ for sim_step in sim_steps:
     for ax, data, title, cmap in zip(axs, data_list, titles, cmaps):
         if cmap == "Purples":
             v_min = 0
-            v_max = 100
+            v_max = 1e9
         else:
             v_min = 0
-            v_max = 100
-        im = ax.pcolormesh(x, z, data, vmin=v_min, vmax=v_max, shading="auto", cmap=cmap)
+            v_max = 1e9
+        im = ax.pcolormesh(x, z, data, shading="auto", cmap=cmap) #, vmin=v_min, vmax=v_max, )
         circle = plt.Circle((0, 0), 1, edgecolor="black", facecolor="none", linewidth=2)
         ax.add_patch(circle)
         ax.set_title(title, fontsize=14)

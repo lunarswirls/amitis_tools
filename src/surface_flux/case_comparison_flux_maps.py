@@ -8,13 +8,13 @@ import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
 # SETTINGS
-cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
-# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+# cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
 
-# DOUBLE CHECK ONLY ONE IS TRUE!!!!
-transient = False
-post_transient = False
-new_state = True
+# FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
+transient = False  # 280-300 s
+post_transient = True  # 330-350 s
+new_state = False  # 680-700 s
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/"
 

@@ -28,10 +28,10 @@ output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitati
 # cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
 cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
 
-# DOUBLE CHECK ONLY ONE IS TRUE!!!!
-transient = False
-post_transient = False
-new_state = True
+# FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
+transient = False  # 280-300 s
+post_transient = True  # 330-350 s
+new_state = False  # 680-700 s
 
 stats_cases_all = []
 

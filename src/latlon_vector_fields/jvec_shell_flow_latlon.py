@@ -10,9 +10,10 @@ import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
 
 # SETTINGS
-case = "RPN"
+case = "CPS"
+step = 115000
 input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/object/"
-ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_115000_xz_comp.nc")
+ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_{step}_xz_comp.nc")
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/jfield_lonlat/{case}_Base/"
 os.makedirs(output_folder, exist_ok=True)
@@ -23,8 +24,8 @@ filter_jmag = False
 RM = 2440.0  # km
 
 # Shell limits
-rmin = 1.0 * RM
-rmax = 1.2 * RM
+rmin = 0.8 * RM
+rmax = 0.85 * RM
 
 # ------------------------
 # LOAD J VECTOR
@@ -130,7 +131,7 @@ J_phi_grid = griddata(
 # Streamplot works on regular grid
 fig, ax = plt.subplots(figsize=(12,6))
 magnitude = np.sqrt(J_theta_grid**2 + J_phi_grid**2)
-strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=1.2, linewidth=1, norm=plt.Normalize(vmin=0, vmax=300))
+strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2, linewidth=1, norm=plt.Normalize(vmin=0, vmax=500))
 
 plt.colorbar(strm.lines, ax=ax, label='$|J|$')
 
@@ -138,10 +139,10 @@ ax.set_xlim(-180,180)
 ax.set_ylim(-90,90)
 ax.set_xlabel('Longitude [°]')
 ax.set_ylabel('Latitude [°]')
-ax.set_title(f'{case} Current streamlines, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM')
+ax.set_title(f'{case} Current streamlines, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM at t = {step*0.002} s')
 ax.grid(True)
 
-outfile = os.path.join(output_folder, f"{case}_current_streamlines_115000_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png")
+outfile = os.path.join(output_folder, f"{case}_current_streamlines_{step}_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png")
 plt.savefig(outfile, dpi=150)
 plt.close()
 print("Saved:", outfile)
