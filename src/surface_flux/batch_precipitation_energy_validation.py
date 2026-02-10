@@ -12,8 +12,8 @@ for case in cases:
     main_path = f'/Volumes/data_backup/mercury/extreme/{case}/05/'
     output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_cnts_den_vr_flux_mass_energy/1degx1deg_binning/"
 
-    plot_meth = "lognorm"  # raw, log, lognorm
-    run_species = "alphas"  # 'all' or 'protons' or 'alphas'
+    plot_meth = "raw"  # raw, log, lognorm
+    run_species = "all"  # 'all' or 'protons' or 'alphas'
 
     outdir = output_folder + f"{run_species}"
     os.makedirs(outdir, exist_ok=True)
@@ -210,7 +210,7 @@ for case in cases:
         (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles"),
         (log_den_norm, (-1, 1), "cividis", r"log$_{10}$($n/n_0$)"),
         (log_vel_norm, (-1.0, 0.0), "plasma", r"log$_{10}$($|v_r|/v_0$)"),
-        (log_flx_norm, (0, 4), "jet", r"log$_{10}$($F_r/F_0$)"),
+        (log_flx_norm, (0, 5), "jet", r"log$_{10}$($F_r/F_0$)"),
         (log_mass_flux_norm, (0, 5), "winter", r"log$_{10}$($F_{mass}/F_{mass,0}$)"),
         (log_energy_flux_norm, (0, 4), "inferno", r"log$_{10}$($F_{energy}/F_{energy,0}$)")
     ]

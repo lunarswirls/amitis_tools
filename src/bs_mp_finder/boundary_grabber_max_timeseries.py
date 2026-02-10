@@ -14,12 +14,12 @@ debug = False
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "RPS_Base"
+case = "CPN_HNHV"
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False  # 280-300 s
 post_transient = False  # 330-350 s
-new_state = False  # 680-700 s
+new_state = True  # 680-700 s
 
 if "Base" in case:
     base_dir = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/"
@@ -165,7 +165,7 @@ for sim_step in sim_steps:
 print("Per-timestep plots complete.")
 
 # ----------------------------
-# POST-LOOP: median + IQR figure (1x3)
+# POST-LOOP: max boundary figure (1x3)
 # ----------------------------
 fig, axes = plt.subplots(1, n_slices, figsize=(6 * n_slices, 6), constrained_layout=True)
 if n_slices == 1:
@@ -194,7 +194,7 @@ for ax, use_slice in zip(axes, use_slices):
     mp_q1 = np.nanpercentile(mp_stack, 25, axis=0)
     mp_q3 = np.nanpercentile(mp_stack, 75, axis=0)
 
-    # occupancy-threshold median masks (consistent with your earlier approach)
+    # occupancy-threshold max masks
     bs_occ, _, bs_med, _ = occupancy_and_bands(np.stack(acc[use_slice]["bs"], axis=0).astype(bool))
     mp_occ, _, mp_med, _ = occupancy_and_bands(np.stack(acc[use_slice]["mp"], axis=0).astype(bool))
 
@@ -211,10 +211,10 @@ for ax, use_slice in zip(axes, use_slices):
     ax.contour(x_plot, y_plot, mp_med.astype(float), levels=[0.5], colors=cfg['mp_col'], linewidths=2)
 
     # --------------------------------------------------
-    # max median distance along axis (XY & XZ)
+    # max q3 distance along axis (XY & XZ)
     # --------------------------------------------------
-    bs_max = max_axis_distance(bs_med, x_plot, y_plot)
-    mp_max = max_axis_distance(mp_med, x_plot, y_plot)
+    bs_max = max_axis_distance((bs_q3 > 0), x_plot, y_plot)
+    mp_max = max_axis_distance((mp_q3 > 0), x_plot, y_plot)
 
     legend_handles = []
 
@@ -282,9 +282,9 @@ for ax, use_slice in zip(axes, use_slices):
 
 if last_im is not None:
     cbar = fig.colorbar(last_im, ax=axes, location="right", shrink=0.75)
-    cbar.set_label(rf"$\mathrm{{Median}}\ {cfg['label']}$")
+    cbar.set_label(rf"$\mathrm{{Max}}\ {cfg['label']}$")
 
-stitle = f"{case.replace("_", " ")} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) Median/IQR"
+stitle = f"{case.replace("_", " ")} BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) Max"
 
 if "Base" in case:
     stitle = stitle + ": Pre-Transient"
@@ -302,19 +302,19 @@ else:
     fig.suptitle(stitle, fontsize=14, y=0.99)
 
 if "Base" in case:
-    median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median.png")
+    max_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_max.png")
 elif "HNHV" in case:
     if transient and not post_transient and not new_state:
-        median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median_transient.png")
+        max_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_max_transient.png")
     elif post_transient and not transient and not new_state:
-        median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median_post-transient.png")
+        max_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_max_post-transient.png")
     elif new_state and not post_transient and not transient:
-        median_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_median_newstate.png")
+        max_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_max_newstate.png")
 
-fig.savefig(median_path, dpi=300)
+fig.savefig(max_path, dpi=300)
 plt.close(fig)
 
-print(f"Saved median plot: {median_path}")
+print(f"Saved max plot: {max_path}")
 
 records = []
 
@@ -357,14 +357,14 @@ for boundary, key in [("BowShock", "bs"), ("Magnetopause", "mp")]:
 df = pd.DataFrame(records)
 
 if "Base" in case:
-    csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}.csv")
+    csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_max_boundary_distances_{slice_tag}.csv")
 elif "HNHV" in case:
     if transient and not post_transient and not new_state:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}_transient.csv")
+        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_max_boundary_distances_{slice_tag}_transient.csv")
     elif post_transient and not transient and not new_state:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}_post-transient.csv")
+        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_max_boundary_distances_{slice_tag}_post-transient.csv")
     elif new_state and not post_transient and not transient:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_median_boundary_distances_{slice_tag}_newstate.csv")
+        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_max_boundary_distances_{slice_tag}_newstate.csv")
 
 df.to_csv(csv_path, index=False)
-print(f"Saved median boundary distances: {csv_path}")
+print(f"Saved max boundary distances: {csv_path}")

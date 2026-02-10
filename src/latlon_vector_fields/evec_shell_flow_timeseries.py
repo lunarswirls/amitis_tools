@@ -10,7 +10,7 @@ import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
 
 # SETTINGS
-case = "CPN_HNHV"
+case = "CPS_HNHV"
 
 filter_jmag = False
 
@@ -20,20 +20,20 @@ sim_end = True
 RM = 2440.0  # km
 
 # Shell limits
-rmin = 0.8 * RM
-rmax = 0.85 * RM
+rmin = 1.0 * RM
+rmax = 1.2 * RM
 
 if "Base" in case:
     input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
-    output_folder = f"/Users/danywaller/Projects/mercury/extreme/jfield_lonlat/{case}/"
+    output_folder = f"/Users/danywaller/Projects/mercury/extreme/efield_lonlat/{case}/"
     sim_steps = list(range(105000, 115000 + 1, 1000))
 elif "HNHV" in case and not sim_end:
     input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
-    output_folder = f"/Users/danywaller/Projects/mercury/extreme/jfield_lonlat/{case}/"
+    output_folder = f"/Users/danywaller/Projects/mercury/extreme/efield_lonlat/{case}/"
     sim_steps = range(115000, 200000 + 1, 1000)
 elif "HNHV" in case and sim_end:
     input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
-    output_folder = f"/Users/danywaller/Projects/mercury/extreme/jfield_lonlat/{case}_end/"
+    output_folder = f"/Users/danywaller/Projects/mercury/extreme/efield_lonlat/{case}_end/"
     sim_steps = range(115000, 350000 + 1, 1000)
 else:
     raise ValueError("Case not recognized")
@@ -45,7 +45,7 @@ for step in sim_steps:
     ncfile = os.path.join(input_folder, f"Amitis_{case}_{step}_xz_comp.nc")
 
     # ------------------------
-    # LOAD J VECTOR
+    # LOAD E VECTOR
     # ------------------------
     def load_jvector(nc_file):
         ds = xr.open_dataset(nc_file)
@@ -54,9 +54,9 @@ for step in sim_steps:
         y = ds["Ny"].values
         z = ds["Nz"].values
 
-        Jx = ds["Jx"].isel(time=0).values
-        Jy = ds["Jy"].isel(time=0).values
-        Jz = ds["Jz"].isel(time=0).values
+        Jx = ds["Ex"].isel(time=0).values
+        Jy = ds["Ey"].isel(time=0).values
+        Jz = ds["Ez"].isel(time=0).values
 
         # Transpose Nz, Ny, Nx → Nx, Ny, Nz
         Jx = np.transpose(Jx, (2, 1, 0))
@@ -147,18 +147,18 @@ for step in sim_steps:
     # Streamplot works on regular grid
     fig, ax = plt.subplots(figsize=(12,6))
     magnitude = np.sqrt(J_theta_grid**2 + J_phi_grid**2)
-    strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2, linewidth=1, norm=plt.Normalize(vmin=0, vmax=500))
+    strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2, linewidth=1, norm=plt.Normalize(vmin=0, vmax=10))
 
-    plt.colorbar(strm.lines, ax=ax, label='|J|')
+    plt.colorbar(strm.lines, ax=ax, label='|E|')
 
     ax.set_xlim(-180,180)
     ax.set_ylim(-90,90)
     ax.set_xlabel('Longitude [°]')
     ax.set_ylabel('Latitude [°]')
-    ax.set_title(f'{case.replace("_", " ")} Current streamlines, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM at t = {step*0.002} s')
+    ax.set_title(f'{case.replace("_", " ")} E streamlines, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM at t = {step*0.002} s')
     ax.grid(True)
 
-    outfile = os.path.join(output_folder, f"{case}_current_streamlines_{step}_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png")
+    outfile = os.path.join(output_folder, f"{case}_evec_streamlines_{step}_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png")
     plt.savefig(outfile, dpi=150)
     plt.close()
 

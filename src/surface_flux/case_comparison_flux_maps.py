@@ -13,8 +13,8 @@ cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False  # 280-300 s
-post_transient = True  # 330-350 s
-new_state = False  # 680-700 s
+post_transient = False  # 330-350 s
+new_state = True  # 680-700 s
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/"
 
@@ -22,7 +22,7 @@ debug = False
 footprints = False
 
 plot_meth = "lognorm"  # raw, log, lognorm
-run_species = "all"  # 'all' or 'protons' or 'alphas'
+run_species = "alphas"  # 'all' or 'protons' or 'alphas'
 
 outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/{run_species}"
 os.makedirs(outdir, exist_ok=True)
