@@ -10,19 +10,24 @@ from pyamitis.amitis_particle import *
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
 case = "CPS_HNHV"
 
-# DOUBLE CHECK ONLY ONE IS TRUE!!!!
-transient = False
-post_icme = False
+# FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
+transient = False  # 280-300 s
+post_transient = False  # 330-350 s
+new_state = False  # 680-700 s
 
 if "Base" in case:
     main_path = f"/Volumes/data_backup/mercury/extreme/{case}/05/"
 elif "HNHV" in case:
-    if transient and not post_icme:
+    if transient and not post_transient and not new_state:
         main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/02/"
-    elif post_icme and not transient:  # TODO: check what folder is correct here
+    elif post_transient and not transient and not new_state:
+        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/03/"
+    elif new_state and not post_transient and not transient:
         main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
     else:
-        main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
+        raise ValueError("Too many flags! Set only one of transient, post_transient, or new_state to True")
+else:
+    raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
 
 select_R = 2480.e3
 

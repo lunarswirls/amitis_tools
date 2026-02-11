@@ -21,8 +21,8 @@ output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitati
 debug = False
 footprints = False
 
-plot_meth = "lognorm"  # raw, log, lognorm
-run_species = "alphas"  # 'all' or 'protons' or 'alphas'
+plot_meth = "raw"  # raw, log, lognorm
+run_species = "all"  # 'all' or 'protons' or 'alphas'
 
 outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/{run_species}"
 os.makedirs(outdir, exist_ok=True)
@@ -30,19 +30,19 @@ os.makedirs(outdir, exist_ok=True)
 species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
 sim_ppc = [24, 24, 11, 11]  # Number of particles per species, based on Amitis.inp
 sim_den = [38.0e6, 76.0e6, 1.0e6, 2.0e6]   # [/m^3]
-sim_vel = [400.e3, 700.0e3, 400.e3, 700.0e3]  # [km/s]
+sim_vel = [400.e3, 700.0e3, 400.e3, 700.0e3]  # [m/s]
 species_mass = np.array([1.0, 1.0, 4.0, 4.0])  # [amu] proton1, proton2, alpha1, alpha2
 species_charge = np.array([1.0, 1.0, 2.0, 2.0])  # [e] proton1, proton2, alpha1, alpha2
 
-sim_dx = 75.e3  # simulation cell size based on Amitis.inp
-sim_dy = 75.e3  # simulation cell size based on Amitis.inp
-sim_dz = 75.e3  # simulation cell size based on Amitis.inp
-sim_robs = 2440.e3  # obstacle radius based on Amitis.inp
+sim_dx = 75.e3  # simulation cell size based on Amitis.inp [m]
+sim_dy = 75.e3  # simulation cell size based on Amitis.inp [m]
+sim_dz = 75.e3  # simulation cell size based on Amitis.inp [m]
+sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
 
 nlat = 90
 nlon = 180
 
-select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection
+select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
 
 # Prepare figure
 fig, axs = plt.subplots(2, 2, figsize=(12, 8), subplot_kw={"projection": "hammer"})
