@@ -5,7 +5,7 @@ import os
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
-from src.bs_mp_finder.boundary_utils import labels_for_slice, coords_for_slice
+from bs_mp_finder.zzz_archive.boundary_utils import labels_for_slice, coords_for_slice
 
 # ======================
 # PHYSICAL CONSTANTS

@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Imports:
-import os
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from src.bs_mp_finder.boundary_utils import *
+from bs_mp_finder.zzz_archive.boundary_utils import *
 
 # ----------------------------
 # SETTINGS
