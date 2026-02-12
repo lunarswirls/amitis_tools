@@ -9,8 +9,8 @@ from pyamitis.amitis_particle import *
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-# cases = ["CPN_Base", "RPN_Base", "CPS_Base", "RPS_Base"]
-cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
+cases = ["CPN_Base", "RPN_Base", "CPS_Base", "RPS_Base"]
+# cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False
@@ -34,10 +34,10 @@ for case in cases:
 
     select_R = 2480.e3
 
-    sub_filepath = main_path + 'particles/'
+    sub_filepath = main_path + 'particles_test/'
     sub_filename = f'Subset_{case}'
 
-    all_particles_directory = main_path + 'precipitation/'
+    all_particles_directory = main_path + 'precipitation_test/'
     os.makedirs(all_particles_directory, exist_ok=True)
 
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"

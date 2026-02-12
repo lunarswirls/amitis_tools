@@ -7,7 +7,7 @@ import xarray as xr
 from scipy.interpolate import RegularGridInterpolator
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-from src.surface_flux.zzz_old.flux_utils import compute_radial_flux
+from src.surface_flux.zzz_archive.flux_utils import compute_radial_flux
 from src.field_topology.topology_utils import compute_ocb_transition
 
 # SETTINGS

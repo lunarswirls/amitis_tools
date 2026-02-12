@@ -8,15 +8,15 @@ import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
 # SETTINGS
-# cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
-cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False  # 280-300 s
 post_transient = False  # 330-350 s
-new_state = True  # 680-700 s
+new_state = False  # 680-700 s
 
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/"
 
 debug = False
 footprints = False
@@ -24,7 +24,7 @@ footprints = False
 plot_meth = "raw"  # raw, log, lognorm
 run_species = "all"  # 'all' or 'protons' or 'alphas'
 
-outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/{run_species}"
+outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/{run_species}"
 os.makedirs(outdir, exist_ok=True)
 
 species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
@@ -63,7 +63,7 @@ for case in cases:
     else:
         raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
 
-    all_particles_directory = main_path + 'precipitation/'
+    all_particles_directory = main_path + 'precipitation_test/'
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
@@ -208,8 +208,8 @@ for case in cases:
     if "Base" in case:
         if plot_meth == "raw":
             data = flux_abs
-            c_min = 0.5e8
-            c_max = 8.5e8
+            c_min = 0.5e2
+            c_max = 1.5e10
             ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
         elif plot_meth == "log":
             data = log_flx

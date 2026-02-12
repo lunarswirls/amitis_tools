@@ -4,10 +4,29 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import src.surface_flux.flux_utils as flux_utils
+import src.surface_flux.flux_utils_testing as flux_utils
 import src.helper_utils as helper_utils
 
 debug = True
+
+species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
+sim_ppc = np.array([24, 0, 11, 0])  # Number of particles per species, based on Amitis.inp
+sim_den = np.array([38.0e6, 0, 1.0e6, 0])  # [/m^3]
+sim_vel = np.array([400.e3, 0, 400.e3, 0])  # [m/s]
+
+# Species properties
+species_mass = np.array([1.0, 0.0, 4.0, 0.0])  # [amu] proton1, proton2, alpha1, alpha2
+species_charge = np.array([1.0, 0.0, 2.0, 0.0])  # [e] proton1, proton2, alpha1, alpha2
+
+sim_dx = 75.e3  # simulation cell size based on Amitis.inp [m]
+sim_dy = 75.e3  # simulation cell size based on Amitis.inp [m]
+sim_dz = 75.e3  # simulation cell size based on Amitis.inp [m]
+sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
+
+nlat = 180
+nlon = 360
+
+select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
 
 cases = ["RPN_Base", "CPN_Base", "RPS_Base", "CPS_Base"]
 
@@ -21,75 +40,67 @@ for case in cases:
     outdir = output_folder + f"{run_species}"
     os.makedirs(outdir, exist_ok=True)
 
-    species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file
-    sim_ppc = np.array([24, 0, 11, 0])  # Number of particles per species, based on Amitis.inp
-    sim_den = np.array([38.0e6, 0, 1.0e6, 0])  # [/m^3]
-    sim_vel = np.array([400.e3, 0, 400.e3, 0])  # [m/s]
+    all_particles_directory = main_path + 'particles_test/'
 
-    # Species properties
-    species_mass = np.array([1.0, 0.0, 4.0, 0.0])  # [amu] proton1, proton2, alpha1, alpha2
-    species_charge = np.array([1.0, 0.0, 2.0, 0.0])  # [e] proton1, proton2, alpha1, alpha2
+    sim_steps = list(range(113000, 115000 + 1, 1000))
 
-    sim_dx = 75.e3  # simulation cell size based on Amitis.inp [m]
-    sim_dy = 75.e3  # simulation cell size based on Amitis.inp [m]
-    sim_dz = 75.e3  # simulation cell size based on Amitis.inp [m]
-    sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
+    flux_cm_all = np.zeros((nlat, nlon))
+    v_r_map_all = np.zeros((nlat, nlon))
+    count_map_all = np.zeros((nlat, nlon))
+    den_cm3_all = np.zeros((nlat, nlon))
+    mass_flux_map_all = np.zeros((nlat, nlon))
+    energy_flux_map_all = np.zeros((nlat, nlon))
 
-    nlat = 180
-    nlon = 360
+    for step in sim_steps:
+        print(f"Running step {step}")
+        all_particles_filename = all_particles_directory + f"Subset_{case}_{step}_full_domain.npz"
 
-    select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
+        flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
+            flux_utils.compute_radial_flux(
+                all_particles_filename=all_particles_filename,
+                sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
+                sim_ppc=sim_ppc, sim_den=sim_den, spec_map=species,
+                species_mass=species_mass, species_charge=species_charge,
+                R_M=sim_robs, select_R=select_R,
+                species=run_species,
+                n_lat=nlat, n_lon=nlon, debug=debug
+            )
 
-    all_particles_directory = main_path + 'precipitation/'
-    all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
+        n_lat = len(lat_centers)
+        n_lon = len(lon_centers)
 
-    flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
-        flux_utils.compute_radial_flux(
-            all_particles_filename=all_particles_filename,
-            sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
-            sim_ppc=sim_ppc, sim_den=sim_den, spec_map=species,
-            species_mass=species_mass, species_charge=species_charge,
-            R_M=sim_robs, select_R=select_R,
-            species=run_species,
-            n_lat=nlat, n_lon=nlon, debug=debug
-        )
+        # Rebuild bin edges consistent with centers
+        lon_edges = np.linspace(-180.0, 180.0, n_lon + 1)
+        lat_edges = np.linspace(-90.0, 90.0, n_lat + 1)
 
-    n_lat = len(lat_centers)
-    n_lon = len(lon_centers)
+        # ========== 2D maps with units ==========
+        cnts = count_map.copy()  # [# particles]
+        den_cm3 = n_shell_map.copy()  # [cm^-3] shell volume density
+        vr = v_r_map.copy()  # [km/s]
+        flux = flux_cm.copy()  # [cm^-2 s^-1]
+        mass_flux = mass_flux_map.copy()  # [amu cm^-2 s^-1]
+        energy_flux = energy_flux_map.copy()  # [eV cm^-2 s^-1]
 
-    # Rebuild bin edges consistent with centers
-    lon_edges = np.linspace(-180.0, 180.0, n_lon + 1)
-    lat_edges = np.linspace(-90.0, 90.0, n_lat + 1)
+        vr_abs = np.abs(vr)  # [km/s]
+        flux_abs = np.abs(flux)  # [cm^-2 s^-1]
+        mass_flux_abs = np.abs(mass_flux)  # [amu cm^-2 s^-1]
+        energy_flux_abs = np.abs(energy_flux)  # [eV cm^-2 s^-1]
 
-    # ========== 2D maps with units ==========
-    cnts = count_map.copy()  # [# particles]
-    den_cm3 = n_shell_map.copy()  # [cm^-3] shell volume density
-    vr = v_r_map.copy()  # [km/s]
-    flux = flux_cm.copy()  # [cm^-2 s^-1]
-    mass_flux = mass_flux_map.copy()  # [amu cm^-2 s^-1]
-    energy_flux = energy_flux_map.copy()  # [eV cm^-2 s^-1]
+        # Set low-count pixels to NaN
+        mask = count_map <= 1e-30
+        cnts[mask] = np.nan
+        den_cm3[mask] = np.nan
+        vr_abs[mask] = np.nan
+        flux_abs[mask] = np.nan
+        mass_flux_abs[mask] = np.nan
+        energy_flux_abs[mask] = np.nan
 
-    vr_abs = np.abs(vr)  # [km/s]
-    flux_abs = np.abs(flux)  # [cm^-2 s^-1]
-    mass_flux_abs = np.abs(mass_flux)  # [amu cm^-2 s^-1]
-    energy_flux_abs = np.abs(energy_flux)  # [eV cm^-2 s^-1]
-
-    # Set low-count pixels to NaN
-    mask = count_map <= 1e-30
-    cnts[mask] = np.nan
-    den_cm3[mask] = np.nan
-    vr_abs[mask] = np.nan
-    flux_abs[mask] = np.nan
-    mass_flux_abs[mask] = np.nan
-    energy_flux_abs[mask] = np.nan
-
-    # ========== Logarithmic maps ==========
-    log_cnts = helper_utils.safe_log10(cnts)
-    log_den  = helper_utils.safe_log10(den_cm3)  # log10(cm^-3)
-    log_vel  = helper_utils.safe_log10(vr_abs)   # log10(km/s)
-    log_flx  = helper_utils.safe_log10(flux_abs) # log10(cm^-2 s^-1)
-    log_mass_flux = helper_utils.safe_log10(mass_flux_abs)  # log10(amu cm^-2 s^-1)
-    log_energy_flux = helper_utils.safe_log10(energy_flux_abs)  # log10(eV cm^-2 s^-1)
+        flux_cm_all += flux_abs
+        v_r_map_all += vr_abs
+        count_map_all += cnts
+        den_cm3_all += den_cm3
+        mass_flux_map_all += mass_flux_abs
+        energy_flux_map_all += energy_flux_abs
 
     # ========== Normalized maps ==========
     if run_species == "all":
@@ -115,13 +126,6 @@ for case in cases:
             J_TO_EV = 6.241509074e18
             sim_energy_flux_upstream = 0.5 * np.sum(species_mass * AMU_TO_KG * sim_den * sim_vel**3) * J_TO_EV * 1e-4  # [eV cm^-2 s^-1]
 
-            # Normalized quantities
-            log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
-            log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)  # [km/s] / [km/s]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
-            log_mass_flux_norm = helper_utils.safe_log10(mass_flux_abs / sim_mass_flux_upstream)
-            log_energy_flux_norm = helper_utils.safe_log10(energy_flux_abs / sim_energy_flux_upstream)
-
     elif run_species == "protons":
         if "Base" in case:
             # Single proton species (index 0)
@@ -144,13 +148,6 @@ for case in cases:
             AMU_TO_KG = 1.66053906660e-27
             J_TO_EV = 6.241509074e18
             sim_energy_flux_upstream = 0.5 * species_mass[0] * AMU_TO_KG * sim_den[0] * sim_vel[0]**3 * J_TO_EV * 1e-4
-
-            # Normalized quantities
-            log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
-            log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)  # [km/s] / [km/s]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
-            log_mass_flux_norm = helper_utils.safe_log10(mass_flux_abs / sim_mass_flux_upstream)
-            log_energy_flux_norm = helper_utils.safe_log10(energy_flux_abs / sim_energy_flux_upstream)
 
     elif run_species == "alphas":
         if "Base" in case:
@@ -175,13 +172,6 @@ for case in cases:
             J_TO_EV = 6.241509074e18
             sim_energy_flux_upstream = 0.5 * species_mass[2] * AMU_TO_KG * sim_den[2] * sim_vel[2]**3 * J_TO_EV * 1e-4
 
-            # Normalized quantities
-            log_den_norm = helper_utils.safe_log10(den_cm3 / (sim_den_tot * 1e-6))  # [cm^-3] / [cm^-3]
-            log_vel_norm = helper_utils.safe_log10(vr_abs / sim_vel_tot)  # [km/s] / [km/s]
-            log_flx_norm = helper_utils.safe_log10(flux_abs / sim_flux_upstream)  # [cm^-2 s^-1] / [cm^-2 s^-1]
-            log_mass_flux_norm = helper_utils.safe_log10(mass_flux_abs / sim_mass_flux_upstream)
-            log_energy_flux_norm = helper_utils.safe_log10(energy_flux_abs / sim_energy_flux_upstream)
-
     # Debug output
     print(f"Upstream normalization values:")
     print(f"  Total density: {sim_den_tot * 1e-6:.1f} cm^-3")
@@ -191,39 +181,23 @@ for case in cases:
     print(f"  Upstream energy flux: {sim_energy_flux_upstream:.2e} eV cm^-2 s^-1")
 
     # Define fields for plotting (6 fields in 3x2 layout)
+    flux_cm_all /= len(sim_steps)
+    v_r_map_all /= len(sim_steps)
+    count_map_all /= len(sim_steps)
+    den_cm3_all /= len(sim_steps)
+    mass_flux_map_all /= len(sim_steps)
+    energy_flux_map_all /= len(sim_steps)
+
     fields_raw = [
-        (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles"),
-        (den_cm3, (np.nanmin(den_cm3), np.nanmax(den_cm3)), "cividis", r"$n$ [cm$^{-3}$]"),
-        (vr_abs, (np.nanmin(vr_abs), np.nanmax(vr_abs)), "plasma", r"$|v_r|$ [km/s]"),
-        (flux_abs, (np.nanmin(flux_abs), np.nanmax(flux_abs)), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
-        (mass_flux_abs, (np.nanmin(mass_flux_abs), np.nanmax(mass_flux_abs)), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
-        (energy_flux_abs, (np.nanmin(energy_flux_abs), np.nanmax(energy_flux_abs)), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
+        (count_map_all, (np.nanmin(count_map_all), np.nanmax(count_map_all)), "viridis", "# particles"),
+        (den_cm3_all, (np.nanmin(den_cm3_all), np.nanmax(den_cm3_all)), "cividis", r"$n$ [cm$^{-3}$]"),
+        (v_r_map_all, (np.nanmin(v_r_map_all), np.nanmax(v_r_map_all)), "plasma", r"$|v_r|$ [km/s]"),
+        (flux_cm_all, (np.nanmin(flux_cm_all), np.nanmax(flux_cm_all)), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
+        (mass_flux_map_all, (np.nanmin(mass_flux_map_all), np.nanmax(mass_flux_map_all)), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
+        (energy_flux_map_all, (np.nanmin(energy_flux_map_all), np.nanmax(energy_flux_map_all)), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
     ]
 
-    fields_log = [
-        (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles"),
-        (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "cividis", r"log$_{10}$($n$) [cm$^{-3}$]"),
-        (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "plasma", r"log$_{10}$($|v_r|$) [km s$^{-1}$]"),
-        (log_flx, (np.nanmin(log_flx), np.nanmax(log_flx)), "jet", r"log$_{10}$($F_r$) [cm$^{-2}$ s$^{-1}$]"),
-        (log_mass_flux, (np.nanmin(log_mass_flux), np.nanmax(log_mass_flux)), "copper", r"log$_{10}$($F_{mass}$) [amu cm$^{-2}$ s$^{-1}$]"),
-        (log_energy_flux, (np.nanmin(log_energy_flux), np.nanmax(log_energy_flux)), "inferno", r"log$_{10}$($F_{energy}$) [eV cm$^{-2}$ s$^{-1}$]")
-    ]
-
-    fields_log_norm = [
-        (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles"),
-        (log_den_norm, (-1, 1), "cividis", r"log$_{10}$($n/n_0$)"),
-        (log_vel_norm, (-1.0, 0.0), "plasma", r"log$_{10}$($|v_r|/v_0$)"),
-        (log_flx_norm, (0, 5), "jet", r"log$_{10}$($F_r/F_0$)"),
-        (log_mass_flux_norm, (0, 5), "winter", r"log$_{10}$($F_{mass}/F_{mass,0}$)"),
-        (log_energy_flux_norm, (0, 4), "inferno", r"log$_{10}$($F_{energy}/F_{energy,0}$)")
-    ]
-
-    if plot_meth == 'raw':
-        use_fields = fields_raw
-    elif plot_meth == 'log':
-        use_fields = fields_log
-    elif plot_meth == 'lognorm':
-        use_fields = fields_log_norm
+    use_fields = fields_raw
 
     titles = ["Counts", "Density", "Radial velocity", "Flux", "Mass flux", "Energy flux"]
 

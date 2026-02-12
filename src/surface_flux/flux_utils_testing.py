@@ -72,7 +72,7 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         pvz = data["vz"]  # [m/s]
         psid = data["sid"].astype(int)
         num_files = 1  # data["num_files"]
-        selected_radius = 1575e3  # data["selected_radius"]  # [m]
+        selected_radius = 2480e3  # data["selected_radius"]  # [m]
 
     if selected_radius < select_R:
         raise ValueError(f"Selected radius {selected_radius:e} < select_R {select_R:e}")
@@ -350,8 +350,10 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
     # v_avg = (mass_flux / mass_count) because mass_flux = Σ(m*w*v) and mass_count = Σ(m*w)
     v_r_map = np.zeros((n_lat, n_lon))
     mass_threshold = 1e10  # [amu * # particles] minimum for statistics
-    valid_mask = mass_count_total > mass_threshold
-    v_r_map[valid_mask] = -(mass_flux_total[valid_mask] / mass_count_total[valid_mask]) * 1e-3  # [km/s], negative for inward
+    # valid_mask = mass_count_total > mass_threshold
+    # valid_mask = macro_count_total > 2
+    # v_r_map[valid_mask] = -(mass_flux_total[valid_mask] / mass_count_total[valid_mask]) * 1e-3  # [km/s], negative for inward
+    v_r_map = -(mass_flux_total / mass_count_total) * 1e-3  # [km/s], negative for inward
 
     # 3) Surface flux [cm^-2 s^-1]
     # Flux = Σ(w_i * |v_r,i|) / area
@@ -379,7 +381,8 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
         print(f"Total physical particles: {count_map_total.sum():.2e}")
         print(f"den_map_cm3:     [{den_map_cm3[den_map_cm3 > 0].min():.2e}, {den_map_cm3.max():.2e}] cm^-3")
         print(f"flux_map_cm:     [{flux_map_cm[flux_map_cm > 0].min():.2e}, {flux_map_cm.max():.2e}] cm^-2 s^-1")
-        print(f"v_r_map:         [{v_r_map[valid_mask].min():.2f}, {v_r_map[valid_mask].max():.2f}] km/s")
+        # print(f"v_r_map:         [{v_r_map[valid_mask].min():.2f}, {v_r_map[valid_mask].max():.2f}] km/s")
+        print(f"v_r_map:         [{v_r_map.min():.2f}, {v_r_map.max():.2f}] km/s")
         print(f"mass_flux_map:   [{mass_flux_map[mass_flux_map > 0].min():.2e}, {mass_flux_map.max():.2e}] amu cm^-2 s^-1")
         print(f"energy_flux_map: [{energy_flux_map[energy_flux_map > 0].min():.2e}, {energy_flux_map.max():.2e}] eV cm^-2 s^-1")
         print("=" * 60 + "\n")
