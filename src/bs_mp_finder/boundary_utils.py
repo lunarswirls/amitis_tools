@@ -1,15 +1,57 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Imports:
-import os
 import numpy as np
 import xarray as xr
-from src.bs_mp_finder.boundary_thresholds import THRESHOLDS as th
-import matplotlib.pyplot as plt
+from bs_mp_finder.boundary_thresholds import THRESHOLDS as th
+
 
 # ----------------------------
-# Helpers
+# helper: max-radius index in 3D mask
 # ----------------------------
+def max_radius_index_xr(mask_da, x_name="Nx", y_name="Ny", z_name="Nz"):
+    """
+    Find max radial distance in 3D xarray mask.
+
+    Returns dict with ix_max, iy_max, iz_max, x_max, y_max, z_max, r_max
+    or None if mask is empty.
+    """
+
+    # Get 1D coordinate arrays
+    x_coords = mask_da.coords[x_name].values
+    y_coords = mask_da.coords[y_name].values
+    z_coords = mask_da.coords[z_name].values
+
+    # Convert mask to numpy for easier processing
+    mask_np = mask_da.values.astype(bool)
+
+    if not mask_np.any():
+        return None
+
+    # Create 3D radial distance field
+    Xg, Yg, Zg = np.meshgrid(x_coords, y_coords, z_coords, indexing='ij')
+    Rg = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
+
+    # Mask radii where boundary exists
+    Rg_masked = np.where(mask_np, Rg, -np.inf)
+
+    # Find flat index of max
+    i_flat = np.argmax(Rg_masked)
+
+    # Unravel to 3D indices
+    ix, iy, iz = np.unravel_index(i_flat, mask_np.shape)
+
+    return {
+        'ix_max': int(ix),
+        'iy_max': int(iy),
+        'iz_max': int(iz),
+        'x_max': float(x_coords[ix]),
+        'y_max': float(y_coords[iy]),
+        'z_max': float(z_coords[iz]),
+        'r_max': float(Rg[ix, iy, iz])
+    }
+
+
 def labels_for_slice(s: str):
     s = s.lower().strip()
     if s == "xy":
@@ -21,429 +63,263 @@ def labels_for_slice(s: str):
     raise ValueError(s)
 
 
-def coords_for_slice(ds: xr.Dataset, use_slice: str, RM_M=2440.0e3):
-    xmin = float(ds.full_xmin); xmax = float(ds.full_xmax)
-    ymin = float(ds.full_ymin); ymax = float(ds.full_ymax)
-    zmin = float(ds.full_zmin); zmax = float(ds.full_zmax)
-    dx = float(ds.full_dx); dy = float(ds.full_dy); dz = float(ds.full_dz)
+def fetch_coords(ds: xr.Dataset, debug: bool, RM_M=2440.0e3):
+    xmin = float(ds.full_xmin)
+    xmax = float(ds.full_xmax)
+    ymin = float(ds.full_ymin)
+    ymax = float(ds.full_ymax)
+    zmin = float(ds.full_zmin)
+    zmax = float(ds.full_zmax)
+    dx = float(ds.full_dx)
+    dy = float(ds.full_dy)
+    dz = float(ds.full_dz)
+
+    dx_km = dx/1e3
+    dy_km = dy/1e3
+    dz_km = dz/1e3
 
     x = np.arange(xmin, xmax, dx) / RM_M
     y = np.arange(ymin, ymax, dy) / RM_M
     z = np.arange(zmin, zmax, dz) / RM_M
 
-    s = use_slice.lower().strip()
-    if s == "xy":
-        return x, y
-    if s == "xz":
-        return x, z
-    if s == "yz":
-        return y, z
-    raise ValueError(use_slice)
-
-
-def extract_slice_fields(ds: xr.Dataset, use_slice: str):
-    """
-    Pull 2D arrays for a slice:
-      xy: Nz ~= 0
-      xz: Ny ~= 0
-      yz: Nx ~= 0  (dayside view looking along -X)
-    """
-    s = use_slice.lower().strip()
-    if s == "xy":
-        sel_kw = dict(Nz=1)
-    elif s == "xz":
-        sel_kw = dict(Ny=1)
-    elif s == "yz":
-        sel_kw = dict(Nx=1)
-    else:
-        raise ValueError(use_slice)
-
-    BX = ds["Bx_tot"].sel(**sel_kw, method="nearest").squeeze()  # [units: nT]
-    BY = ds["By_tot"].sel(**sel_kw, method="nearest").squeeze()  # [units: nT]
-    BZ = ds["Bz_tot"].sel(**sel_kw, method="nearest").squeeze()  # [units: nT]
-
-    vx_proton = ds["vx01"].sel(**sel_kw, method="nearest").squeeze() + ds["vx02"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vy_proton = ds["vy01"].sel(**sel_kw, method="nearest").squeeze() + ds["vy02"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vz_proton = ds["vz01"].sel(**sel_kw, method="nearest").squeeze() + ds["vz02"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-
-    vx_alpha = ds["vx03"].sel(**sel_kw, method="nearest").squeeze() + ds["vx04"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vy_alpha = ds["vy03"].sel(**sel_kw, method="nearest").squeeze() + ds["vy04"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-    vz_alpha = ds["vz03"].sel(**sel_kw, method="nearest").squeeze() + ds["vz04"].sel(**sel_kw, method="nearest").squeeze()  # [units: km/s]
-
-    # pre-ICME protons + ICME protons
-    den_proton = ds["den01"].sel(**sel_kw, method="nearest").squeeze() + ds["den02"].sel(**sel_kw, method="nearest").squeeze()  # [units: cm^-3]
-
-    # pre-ICME alphas + ICME alphas
-    den_alpha = ds["den03"].sel(**sel_kw, method="nearest").squeeze() + ds["den04"].sel(**sel_kw, method="nearest").squeeze()  # [units: cm^-3]
-
-    JX = ds["Jx"].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
-    JY = ds["Jy"].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
-    JZ = ds["Jz"].sel(**sel_kw, method="nearest").squeeze()  # [units: nA/m^2]
-
-    return BX,BY,BZ,vx_proton,vy_proton,vz_proton,vx_alpha,vy_alpha,vz_alpha,den_proton,den_alpha,JX,JY,JZ
-
-
-def compute_masks_one_timestep(ds: xr.Dataset, use_slice: str, plot_id: str, case: str, sim_step: float, debug: bool=False):
-    """
-    Compute Bmag and BS/MP masks for one timestep.
-    Units of Nx, Ny, Nz are km
-    Units of magnetic field are nT
-    Units of velocity are km/s
-    Units of density are cm^-3
-    Units of current are nA/m^2
-
-    Returns: x_plot, y_plot, Bmag(np.ndarray), bs_mask(bool ndarray), mp_mask(bool ndarray)
-    """
     if debug:
-        print("DEBUGGING: compute_masks_one_timestep")
+        print(f"Grid spacing: dx={dx:.1f} km, dy={dy:.1f} km, dz={dz:.1f} km")
+        print(f"Domain: X=[{x[0]:.2f}, {x[-1]:.2f}] R_M ({len(x)} cells)")
+        print(f"        Y=[{y[0]:.2f}, {y[-1]:.2f}] R_M ({len(y)} cells)")
+        print(f"        Z=[{z[0]:.2f}, {z[-1]:.2f}] R_M ({len(z)} cells)")
 
-    x_plot, y_plot = coords_for_slice(ds, use_slice)
+    return dx_km, dy_km, dz_km, x, y, z
 
-    BX,BY,BZ,vx01,vy01,vz01,vx03,vy03,vz03,den01,den03,JX,JY,JZ = extract_slice_fields(ds, use_slice)
 
-    tot_den = den01 + den03  # units: cm^-3
-    Pmag = (tot_den) # * 1e15).assign_attrs(units="km^-3", converted_from="cm^-3", conversion_factor="1e15")  # units: km^-3
-    Bmag = np.sqrt(BX**2 + BY**2 + BZ**2)  # units: nT
-    Vmag01 = np.sqrt(vx01**2 + vy01**2 + vz01**2)  # units: km/s
-    Vmag03 = np.sqrt(vx03**2 + vy03**2 + vz03**2)  # units: km/s
-    Vmag = Vmag01 + Vmag03  # units: km/s
-    Jmag = (np.sqrt(JX**2 + JY**2 + JZ**2)) # * 1e6).assign_attrs(units="nA/km^2", converted_from="nA/m^2", conversion_factor="1e6")   # units: nA/km^2
+def extract_3d_fields(ds: xr.Dataset):
+    """
+    Extract all 3D fields needed for boundary detection
+    """
+    # Magnetic field
+    BX = ds["Bx_tot"].isel(time=0).values  # nT
+    BY = ds["By_tot"].isel(time=0).values
+    BZ = ds["Bz_tot"].isel(time=0).values
+    # Transpose Nz, Ny, Nx → Nx, Ny, Nz
+    BX = np.transpose(BX, (2, 1, 0))
+    BY = np.transpose(BY, (2, 1, 0))
+    BZ = np.transpose(BZ, (2, 1, 0))
 
-    B = xr.concat([BX, BY, BZ], dim="comp").assign_coords(comp=["x", "y", "z"])
-    Bhat = B / Bmag
+    # Proton velocities (pre-ICME + ICME)
+    vx_proton = ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values  # km/s
+    vy_proton = ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values
+    vz_proton = ds["vz01"].isel(time=0).values + ds["vz02"].isel(time=0).values
+    # Transpose Nz, Ny, Nx → Nx, Ny, Nz
+    vx_proton = np.transpose(vx_proton, (2, 1, 0))
+    vy_proton = np.transpose(vy_proton, (2, 1, 0))
+    vz_proton = np.transpose(vz_proton, (2, 1, 0))
 
-    s = use_slice.lower().strip()
+    # Alpha velocities (pre-ICME + ICME)
+    vx_alpha = ds["vx03"].isel(time=0).values + ds["vx04"].isel(time=0).values  # km/s
+    vy_alpha = ds["vy03"].isel(time=0).values + ds["vy04"].isel(time=0).values
+    vz_alpha = ds["vz03"].isel(time=0).values + ds["vz04"].isel(time=0).values
+    # Transpose Nz, Ny, Nx → Nx, Ny, Nz
+    vx_alpha = np.transpose(vx_alpha, (2, 1, 0))
+    vy_alpha = np.transpose(vy_alpha, (2, 1, 0))
+    vz_alpha = np.transpose(vz_alpha, (2, 1, 0))
 
-    # in-plane derivatives
-    if s == "xy":
-        dB_du    = Bmag.differentiate("Nx")
-        dV_du    = Vmag.differentiate("Nx")
-        dJ_du    = Jmag.differentiate("Nx")
-        dJy_du   = JY.differentiate("Nx")
-        dP_du    = Pmag.differentiate("Nx")
-        dBhat_du = Bhat.differentiate("Nx")
+    # Densities (pre-ICME + ICME)
+    den_proton = ds["den01"].isel(time=0).values + ds["den02"].isel(time=0).values  # cm^-3
+    den_alpha = ds["den03"].isel(time=0).values + ds["den04"].isel(time=0).values
+    tot_den = den_proton + den_alpha
+    # Transpose Nz, Ny, Nx → Nx, Ny, Nz
+    tot_den = np.transpose(tot_den, (2, 1, 0))
 
-        dB_dv    = Bmag.differentiate("Ny")
-        dV_dv    = Vmag.differentiate("Ny")
-        dJ_dv    = Jmag.differentiate("Ny")
-        dJy_dv = JY.differentiate("Ny")
-        dP_dv    = Pmag.differentiate("Ny")
-        dBhat_dv = Bhat.differentiate("Ny")
+    # Currents
+    JX = ds["Jx"].isel(time=0).values  # nA/m^2
+    JY = ds["Jy"].isel(time=0).values
+    JZ = ds["Jz"].isel(time=0).values
+    # Transpose Nz, Ny, Nx → Nx, Ny, Nz
+    JX = np.transpose(JX, (2, 1, 0))
+    JY = np.transpose(JY, (2, 1, 0))
+    JZ = np.transpose(JZ, (2, 1, 0))
 
-    elif s == "xz":
-        dB_du    = Bmag.differentiate("Nx")
-        dV_du    = Vmag.differentiate("Nx")
-        dJ_du    = Jmag.differentiate("Nx")
-        dJy_du = JY.differentiate("Nx")
-        dP_du    = Pmag.differentiate("Nx")
-        dBhat_du = Bhat.differentiate("Nx")
+    return BX, BY, BZ, vx_proton, vy_proton, vz_proton, vx_alpha, vy_alpha, vz_alpha, den_proton, den_alpha, JX, JY, JZ, tot_den
 
-        dB_dv    = Bmag.differentiate("Nz")
-        dV_dv    = Vmag.differentiate("Nz")
-        dJ_dv    = Jmag.differentiate("Nz")
-        dJy_dv = JY.differentiate("Nz")
-        dP_dv    = Pmag.differentiate("Nz")
-        dBhat_dv = Bhat.differentiate("Nz")
 
-    elif s == "yz":
-        dB_du    = Bmag.differentiate("Ny")
-        dV_du    = Vmag.differentiate("Ny")
-        dJ_du    = Jmag.differentiate("Ny")
-        dJy_du = JY.differentiate("Ny")
-        dP_du    = Pmag.differentiate("Ny")
-        dBhat_du = Bhat.differentiate("Ny")
-
-        dB_dv    = Bmag.differentiate("Nz")
-        dV_dv    = Vmag.differentiate("Nz")
-        dJ_dv    = Jmag.differentiate("Nz")
-        dJy_dv = JY.differentiate("Nz")
-        dP_dv    = Pmag.differentiate("Nz")
-        dBhat_dv = Bhat.differentiate("Nz")
-    else:
-        raise ValueError(use_slice)
-
-    gradB = np.sqrt(dB_du**2 + dB_dv**2)
-    gradV = np.sqrt(dV_du**2 + dV_dv**2)
-    gradP = np.sqrt(dP_du**2 + dP_dv**2)
-    gradJ = np.sqrt(dJ_du**2 + dJ_dv**2)
-    gradJy = np.sqrt(dJy_du**2 + dJy_dv**2)
-
-    # nan out anything inside of mercury
-    y_axis = x_plot  # coords_for_slice returns (Y, Z) for yz
-    z_axis = y_plot
-    Yg, Zg = np.meshgrid(y_axis, z_axis, indexing="xy")
-    r = np.sqrt(Yg ** 2 + Zg ** 2)
-
-    # Exclude inside the planetary body
-    outside_body = r >= 1.0
-
-    gradB = gradB.where(outside_body)
-    gradV = gradV.where(outside_body)
-    gradP = gradP.where(outside_body)
-    gradJ = gradJ.where(outside_body)
-    gradJy = gradJy.where(outside_body)
+def compute_masks_3d(f_3d: str, plot_id: str, debug: bool = False):
+    """
+    Compute 3D bowshock and magnetopause masks from 3D NetCDF file.
+    Returns: x_coords, y_coords, z_coords, plot_bg, bs_mask_3d, mp_mask_3d
+    """
+    ds = xr.open_dataset(f_3d)
 
     if debug:
-        fig1, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(8, 6), constrained_layout=True)
+        print("DEBUG: compute_masks_3d")
 
-        last_im = ax1.pcolormesh(x_plot, y_plot, gradB, shading="auto", cmap="cividis", vmin=0, vmax=0.5)
-        cbar = fig1.colorbar(last_im, ax=ax1, location="right", shrink=0.9)
-        cbar.set_label(r"nT/km")
-        ax1.set_title(r"$\nabla$|B|")
+    # Extract 3D fields (already numpy arrays)
+    BX, BY, BZ, vx01, vy01, vz01, vx03, vy03, vz03, den01, den03, JX, JY, JZ, tot_den = extract_3d_fields(ds)
 
-        last_im = ax2.pcolormesh(x_plot, y_plot, gradV, shading="auto", cmap="plasma", vmin=0, vmax=1)
-        cbar = fig1.colorbar(last_im, ax=ax2, location="right", shrink=0.9)
-        cbar.set_label(r"1/s")
-        ax2.set_title(r"$\nabla$|V|")
+    # Derived scalar fields (all numpy)
+    Bmag = np.sqrt(BX ** 2 + BY ** 2 + BZ ** 2)  # nT
+    Vmag01 = np.sqrt(vx01 ** 2 + vy01 ** 2 + vz01 ** 2)  # km/s
+    Vmag03 = np.sqrt(vx03 ** 2 + vy03 ** 2 + vz03 ** 2)  # km/s
+    Vmag = Vmag01 + Vmag03  # km/s
+    Jmag = np.sqrt(JX ** 2 + JY ** 2 + JZ ** 2)  # nA/m^2
+    Pmag = tot_den  # cm^-3
 
-        last_im = ax3.pcolormesh(x_plot, y_plot, gradP, shading="auto", cmap="cool", vmin=0, vmax=1)
-        cbar = fig1.colorbar(last_im, ax=ax3, location="right", shrink=0.9)
-        cbar.set_label(r"cm$^{-3}$/km")
-        ax3.set_title(r"$\nabla$|N|")
+    if debug:
+        print(f"Bmag min/med/max={np.nanmin(Bmag):.3f}, {np.nanmedian(Bmag):.3f}, {np.nanmax(Bmag):.3f}")
+        print(f"Vmag min/med/max={np.nanmin(Vmag):.3f}, {np.nanmedian(Vmag):.3f}, {np.nanmax(Vmag):.3f}")
+        print(f"Pmag min/med/max={np.nanmin(Pmag):.3f}, {np.nanmedian(Pmag):.3f}, {np.nanmax(Pmag):.3f}")
 
-        last_im = ax4.pcolormesh(x_plot, y_plot, gradJy, shading="auto", cmap="viridis", vmin=0, vmax=1)
-        cbar = fig1.colorbar(last_im, ax=ax4, location="right", shrink=0.9)
-        cbar.set_label(r"(nA/m$^2$)/km")
-        ax4.set_title(r"$\nabla$|J$_y$|")
+    dx_km, dy_km, dz_km, x_coords, y_coords, z_coords = fetch_coords(ds, debug=debug)
 
-        for ax in [ax1, ax2, ax3, ax4]:
-            ax.set_xlim([-5, 5])
-            ax.set_ylim([-5, 5])
-            ax.set_aspect("equal")
+    # Compute gradients WITH PROPER SPACING (in physical units: field/km)
+    dB_du = np.gradient(Bmag, dx_km, axis=0)  # nT/km
+    dV_du = np.gradient(Vmag, dx_km, axis=0)  # (km/s)/km = 1/s
+    dJ_du = np.gradient(Jmag, dx_km, axis=0)  # (nA/m^2)/km
+    dJy_du = np.gradient(JY, dx_km, axis=0)  # (nA/m^2)/km
+    dP_du = np.gradient(Pmag, dx_km, axis=0)  # (cm^-3)/km
 
-        fig1.suptitle(f"{case.replace("_", " ")} {use_slice.upper()} t={sim_step*0.002} s", y=0.99)
-        # fig1.show()
-        outdir = f"/Users/danywaller/Projects/mercury/extreme/slice_bowshock/{case}/gradients/"
-        os.makedirs(outdir, exist_ok=True)
-        fig1.savefig(os.path.join(outdir, f"{case}_gradients_{use_slice.upper()}_{sim_step:06d}.png"), dpi=300)
-        plt.close(fig1)
+    dB_dv = np.gradient(Bmag, dy_km, axis=1)  # nT/km
+    dV_dv = np.gradient(Vmag, dy_km, axis=1)  # 1/s
+    dJ_dv = np.gradient(Jmag, dy_km, axis=1)
+    dJy_dv = np.gradient(JY, dy_km, axis=1)
+    dP_dv = np.gradient(Pmag, dy_km, axis=1)
 
-    rotation_strength = (dBhat_du**2 + dBhat_dv**2).sum("comp") ** 0.5
+    dB_dw = np.gradient(Bmag, dz_km, axis=2)  # nT/km
+    dV_dw = np.gradient(Vmag, dz_km, axis=2)  # 1/s
+    dJ_dw = np.gradient(Jmag, dz_km, axis=2)
+    dJy_dw = np.gradient(JY, dz_km, axis=2)
+    dP_dw = np.gradient(Pmag, dz_km, axis=2)
 
-    bmag_threshold_bs = th["Bgradmax_bs"] * np.nanmax(gradB)
-    vmag_threshold_bs = th["Vgradmax_bs"] * np.nanmax(gradV)
-    jmag_threshold_bs = th["Jgradmax_bs"] * np.nanmax(gradJ)
-    den_threshold_bs  = th["Pgradmax_bs"] * np.nanmax(gradP)
+    # 3D gradient magnitudes
+    gradB_mag = np.sqrt(dB_du ** 2 + dB_dv ** 2 + dB_dw ** 2)  # nT/km
+    gradV_mag = np.sqrt(dV_du ** 2 + dV_dv ** 2 + dV_dw ** 2)  # 1/s
+    gradP_mag = np.sqrt(dP_du ** 2 + dP_dv ** 2 + dP_dw ** 2)  # cm^-3/km
+    gradJ_mag = np.sqrt(dJ_du ** 2 + dJ_dv ** 2 + dJ_dw ** 2)  # (nA/m^2)/km
+    gradJy_mag = np.sqrt(dJy_du ** 2 + dJy_dv ** 2 + dJy_dw ** 2)
 
-    bmag_threshold_mp = th["Bgradmax_mp"] * np.nanmax(gradB)
-    vmag_threshold_mp = th["Vgradmax_mp"] * np.nanmax(gradV)
-    jmag_threshold_mp = th["Jgradmax_mp"] * np.nanmax(gradJy)
-    den_threshold_mp = th["Pgradmax_mp"] * np.nanmax(gradP)
+    # Planetary exclusion (1 < r < 4 R_M)
+    Xg, Yg, Zg = np.meshgrid(x_coords, y_coords, z_coords, indexing='ij')
+    Rg = np.sqrt(Xg ** 2 + Yg ** 2 + Zg ** 2)
+    outside_body = (Rg >= 1.0) & (Rg < 4.0)
 
-    # rot_threshold_mp = th["rotmax_mp"] * np.nanmax(rotation_strength)
+    if debug:
+        print(f"Valid volume: {np.sum(outside_body)} / {outside_body.size} cells ({100 * np.mean(outside_body):.1f}%)")
 
-    s = use_slice.lower().strip()
+    # Apply exclusion
+    gradB_mag = np.where(outside_body, gradB_mag, np.nan)
+    gradV_mag = np.where(outside_body, gradV_mag, np.nan)
+    gradP_mag = np.where(outside_body, gradP_mag, np.nan)
+    gradJ_mag = np.where(outside_body, gradJ_mag, np.nan)
+    gradJy_mag = np.where(outside_body, gradJy_mag, np.nan)
+    dV_du = np.where(outside_body, dV_du, np.nan)
+    dJ_du = np.where(outside_body, dJ_du, np.nan)
+    dP_du = np.where(outside_body, dP_du, np.nan)
+    dJy_du = np.where(outside_body, dJy_du, np.nan)
+    dB_du = np.where(outside_body, dB_du, np.nan)
 
-    if s in ("xy", "xz"):
-        if 0:
-            # XY/XZ logic
-            magnetopause_mask = (
-                    (gradJ > jmag_threshold) &
-                    (gradP > den_threshold) & (dP_du > 0) &
-                    (gradV < vmag_threshold) & (dV_du < 0) &
-                    (rotation_strength > rot_threshold_mp)
-            )
-            bowshock_mask = (
-                    (gradJ > jmag_threshold) &
-                    (gradP > den_threshold) & (dP_du < 0) &
-                    (rotation_strength < rot_threshold_mp)
-            )
-        # XY/XZ logic
+    if debug:
+        print(
+            f"gradBmag min/med/max={np.nanmin(gradB_mag):.6f}, {np.nanmedian(gradB_mag):.6f}, {np.nanmax(gradB_mag):.6f} nT/km")
+        print(
+            f"gradVmag min/med/max={np.nanmin(gradV_mag):.6f}, {np.nanmedian(gradV_mag):.6f}, {np.nanmax(gradV_mag):.6f} s^-1")
+        print(
+            f"gradPmag min/med/max={np.nanmin(gradP_mag):.6f}, {np.nanmedian(gradP_mag):.6f}, {np.nanmax(gradP_mag):.6f} cm^-3/km")
 
-        bowshock_mask = (
-                (gradV > vmag_threshold_bs) & (dV_du > 0) &
-                (gradJ > jmag_threshold_bs) & (dJ_du < 0) &
-                (gradP > den_threshold_bs) & (dP_du < 0) # &
-                # (gradB > bmag_threshold_bs) & (dB_du < 0)
-        )
+    # Thresholds based on maxima
+    bmag_threshold_bs = th["Bgradmax_bs"] * np.nanmax(np.abs(gradB_mag))
+    vmag_threshold_bs = th["Vgradmax_bs"] * np.nanmax(np.abs(gradV_mag))
+    jmag_threshold_bs = th["Jgradmax_bs"] * np.nanmax(np.abs(gradJ_mag))
+    den_threshold_bs = th["Pgradmax_bs"] * np.nanmax(np.abs(gradP_mag))
 
-        magnetopause_mask = (
-                (gradJy > jmag_threshold_mp) & (dJy_du > 0) &
-                (gradP > den_threshold_mp) & (dP_du > 0) &
-                (gradB > bmag_threshold_mp) & (dB_du < 0)
-        )
+    bmag_threshold_mp = th["Bgradmax_mp"] * np.nanmax(np.abs(gradB_mag))
+    vmag_threshold_mp = th["Vgradmax_mp"] * np.nanmax(np.abs(gradV_mag))
+    jmag_threshold_mp = th["Jgradmax_mp"] * np.nanmax(np.abs(gradJy_mag))
+    den_threshold_mp = th["Pgradmax_mp"] * np.nanmax(np.abs(gradP_mag))
 
-        bowshock_mask = bowshock_mask & (~magnetopause_mask)
+    if debug:
+        print(
+            f"Thresholds - BS: B={bmag_threshold_bs:.6f}, V={vmag_threshold_bs:.6f}, J={jmag_threshold_bs:.6f}, P={den_threshold_bs:.6f}")
+        print(
+            f"Thresholds - MP: B={bmag_threshold_mp:.6f}, V={vmag_threshold_mp:.6f}, Jy={jmag_threshold_mp:.6f}, P={den_threshold_mp:.6f}")
 
-    elif s == "yz":
-        # ------------------------------------------------------------
-        # YZ dayside view (looking along −X):
-        #   horizontal axis = Y
-        #   vertical axis   = Z
-        #
-        # The planet is centered at Y=0, so "inward" direction flips sign:
-        #   - On Y>0 side, inward is toward decreasing Y
-        #   - On Y<0 side, inward is toward increasing Y
-        #
-        # Therefore use a symmetric inward-density-gradient proxy:
-        #   dP_inward = -sign(Y) * dP/dY
-        # ------------------------------------------------------------
+    # Bowshock: outward velocity gradient, strong current, density decrease along X
+    bowshock_mask = (
+            (gradV_mag > vmag_threshold_bs) & (dV_du > 0) &
+            (gradJ_mag > jmag_threshold_bs) & (dJ_du < 0) &
+            (gradP_mag > den_threshold_bs) & (dP_du < 0) &
+            outside_body
+    )
 
-        # Horizontal derivative is d/du = d/dY (Ny)
-        dP_h = dP_du  # already computed as differentiate("Ny")
+    # Magnetopause: strong Jy gradient, density increase along X, B gradient
+    magnetopause_mask = (
+            (gradJy_mag > jmag_threshold_mp) & (dJy_du > 0) &
+            (gradP_mag > den_threshold_mp) & (dP_du > 0) &
+            (gradB_mag > bmag_threshold_mp) & (dB_du < 0) &
+            outside_body
+    )
 
-        # Build Y–Z coordinate grid (in R_M)
-        y_axis = x_plot  # coords_for_slice returns (Y, Z) for yz
-        z_axis = y_plot
-        Yg, Zg = np.meshgrid(y_axis, z_axis, indexing="xy")
-        r = np.sqrt(Yg ** 2 + Zg ** 2)
+    # Mutual exclusivity
+    bowshock_mask = bowshock_mask & ~magnetopause_mask
 
-        # Exclude inside the planetary body
-        outside_body = r >= 1.0
-
-        # Rotation field as numpy for fast masking
-        gradB = gradB.values
-        gradJy = gradJy.values
-        gradP = gradP.values
-        rot = rotation_strength.values
-
-        # ------------------------------------------------------------
-        # Unified candidate gate on strong |J| and density gradients
-        # ------------------------------------------------------------
-        candidate = (
-                (gradJy > jmag_threshold_bs) &
-                (gradP > den_threshold_bs) &
-                outside_body &
-                np.isfinite(rot)
-        )
-
-        # cand = candidate.values.astype(bool)
-        cand = candidate.astype(bool)
-
-        if debug:
-            south = (Zg < -1.5) & (np.abs(Yg) < 2.0) & outside_body
-
-            def cnt(mask):
-                return int(np.count_nonzero(mask))
-
-            print(
-                f"max gradJ={np.nanmax(gradJy):.3g} thr={jmag_threshold_bs:.3g} "
-                f"max gradP={np.nanmax(gradP):.3g} thr={den_threshold_bs:.3g} "
-                f"max gradB={np.nanmax(gradB):.3g} thr={bmag_threshold_bs:.3g} "
-                f"max rot={np.nanmax(rotation_strength):.3g} thr={rot_threshold_mp:.3g} "
-                f"cand={cnt(cand)} cand_south={cnt(cand & south)}\n")
-
-        if np.count_nonzero(cand) == 0:
-            bowshock_mask = candidate * False
-            magnetopause_mask = candidate * False
-
-        else:
-            # --------------------------------------------------------
-            # Symmetric inward density-gradient proxy
-            # --------------------------------------------------------
-            dPdy = dP_h.values
-            # sign(Y): +1 (Y>0), -1 (Y<0); ignore a thin band near Y=0
-            sY = np.sign(Yg)
-            eps_rm = 0.001
-            y0_band = np.abs(Yg) <= eps_rm
-            dP_inward = -sY * dPdy
-
-            # Initial split (symmetric)
-            bs_pre = cand & (~y0_band) & (dP_inward > 0.0) & (gradB > bmag_threshold_bs)
-            mp_pre = cand & (~y0_band) & (dP_inward < 0.0)
-
-            # --------------------------------------------------------
-            # MP: strong rotation; BS: weak rotation
-            # --------------------------------------------------------
-            mp_gate = rot > float(rot_threshold_mp)
-            bs_gate = rot < float(rot_threshold_mp)
-
-            # Secondary split (rotation gates)
-            bs_post = bs_pre & bs_gate  # inward increase, weak rotation
-            mp_post = mp_pre & mp_gate  # inward decrease, strong rotation
-
-            # Convert back to xarray and enforce exclusivity
-            magnetopause_mask = xr.DataArray(mp_pre, coords=gradV.coords, dims=gradV.dims)
-            bowshock_mask = xr.DataArray(bs_pre, coords=gradV.coords, dims=gradV.dims)
-            bowshock_mask = bowshock_mask & (~magnetopause_mask)
-    else:
-        raise ValueError(use_slice)
-
-    # Exclusion region (only meaningful when X is in-plane)
-    if s in ("xy", "xz"):
-        x_bad = x_plot < 0.75
-        y_bad = (y_plot > -1.2) & (y_plot < 1.2)
-        exclude_region = y_bad[:, None] & x_bad[None, :]
-        bowshock_mask = bowshock_mask & (~exclude_region)
-        magnetopause_mask = magnetopause_mask & (~exclude_region)
-
-    bg_map = {
-        "Bmag": Bmag,
-        "Jmag": Jmag,
-        "Pmag": Pmag,
-    }
-
+    bg_map = {"Bmag": Bmag, "Jmag": Jmag, "Pmag": Pmag}
     if plot_id not in bg_map:
         raise ValueError(f"Invalid plot_id='{plot_id}'. Options: {list(bg_map)}")
+    plot_bg = bg_map[plot_id]
 
-    plot_bg = bg_map[plot_id].values
+    if debug:
+        print(f"3D BS candidates: {np.sum(bowshock_mask)}")
+        print(f"3D MP candidates: {np.sum(magnetopause_mask)}")
+        print(f"BS volume fraction: {np.mean(bowshock_mask):.6f}")
+        print(f"MP volume fraction: {np.mean(magnetopause_mask):.6f}\n")
 
-    # if plot_id == "Pmag":
-        # plot_bg = plot_bg * 1e-6  # convert back to cm^-3
+    ds.close()
 
-    return x_plot, y_plot, plot_bg, bowshock_mask, magnetopause_mask
+    # Convert masks to xarray DataArrays
+    bs_mask_da = xr.DataArray(
+        bowshock_mask.astype(np.uint8),
+        coords={'Nx': x_coords, 'Ny': y_coords, 'Nz': z_coords},
+        dims=['Nx', 'Ny', 'Nz']
+    )
+    mp_mask_da = xr.DataArray(
+        magnetopause_mask.astype(np.uint8),
+        coords={'Nx': x_coords, 'Ny': y_coords, 'Nz': z_coords},
+        dims=['Nx', 'Ny', 'Nz']
+    )
+
+    return x_coords, y_coords, z_coords, plot_bg, bs_mask_da, mp_mask_da
 
 
 def slice_axes_dims(use_slice: str):
-    """
-    For stacking masks consistently (2D):
-      xy -> (Ny, Nx)
-      xz -> (Nz, Nx)
-      yz -> (Nz, Ny)
-    """
     s = use_slice.lower().strip()
     if s == "xy":
-        return ("Ny", "Nx")
+        return "Ny", "Nx"
     if s == "xz":
-        return ("Nz", "Nx")
+        return "Nz", "Nx"
     if s == "yz":
-        return ("Nz", "Ny")
+        return "Nz", "Ny"
     raise ValueError(use_slice)
 
 
 def occupancy_and_bands(stack_bool: np.ndarray, thresholds=(0.25, 0.125, 0.0625)):
-    """
-    stack_bool: (T, H, W) boolean
-    returns occupancy p (H,W) in [0,1] and masks at thresholds.
-    """
     p = stack_bool.mean(axis=0)
     q1_thr, med_thr, q3_thr = thresholds
-    q1mask  = (p >= q1_thr)
-    medmask = (p >= med_thr)
-    q3mask  = (p >= q3_thr)
-    return p, q1mask, medmask, q3mask
+    return p, (p >= q1_thr), (p >= med_thr), (p >= q3_thr)
 
 
 def max_axis_distance(mask, x, y, width_km=500):
-    """
-    Take the median X value of contour points within +/- width_km
-    of the axis. Returns (x_med, axis_med, r) as Python floats.
-    """
     pts = np.argwhere(mask)
-
     if pts.size == 0:
         return None
 
-    width_re = width_km / 2440.0  # km → R_M
-
-    x_vals = []
-    a_vals = []
+    width_re = width_km / 2440.0
+    x_vals, a_vals = [], []
 
     for iy, ix in pts:
-        av = float(y[iy])   # Y (XY) or Z (XZ)
-
-        if abs(av) > width_re:
-            continue
-
+        av = float(y[iy])
+        if abs(av) > width_re: continue
         xv = float(x[ix])
         x_vals.append(xv)
         a_vals.append(av)
 
-    if len(x_vals) == 0:
+    if not x_vals:
         return None
 
-    x_med = float(np.median(x_vals))
-    a_med = float(np.median(a_vals))
-    r = float(np.hypot(x_med, a_med))
-
-    return x_med, a_med, r
+    return float(np.median(x_vals)), float(np.median(a_vals)), float(np.hypot(*np.median([x_vals, a_vals], axis=0)))
