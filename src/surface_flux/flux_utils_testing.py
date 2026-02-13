@@ -357,11 +357,11 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
     # 3) Surface flux [cm^-2 s^-1]
     # Flux = Σ(w_i * |v_r,i|) / area
-    # flux_map = np.where(area > 0, flux_contrib_total / area, 0.0)  # [m^-2 s^-1]
-    # flux_map_cm = flux_map * 1e-4  # [cm^-2 s^-1]
-
-    flux_map = den_map * np.abs(v_r_map)*1e3  # [m^-2 s^-1]
+    flux_map = np.where(area > 0, flux_contrib_total / area, 0.0)  # [m^-2 s^-1]
     flux_map_cm = flux_map * 1e-4  # [cm^-2 s^-1]
+
+    # flux_map = den_map * np.abs(v_r_map)*1e3  # [m^-2 s^-1]
+    # flux_map_cm = flux_map * 1e-4  # [cm^-2 s^-1]
 
     # 4) Mass flux [amu cm^-2 s^-1]
     # Mass flux = Σ(m * w_i * |v_r,i|) / area

@@ -23,8 +23,8 @@ sim_dy = 75.e3  # simulation cell size based on Amitis.inp [m]
 sim_dz = 75.e3  # simulation cell size based on Amitis.inp [m]
 sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
 
-nlat = 180
-nlon = 360
+nlat = 90
+nlon = 180
 
 select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
 
