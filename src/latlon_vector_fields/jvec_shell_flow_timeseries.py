@@ -10,9 +10,10 @@ import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
 
 # SETTINGS
-case = "CPN_HNHV"
+case = "CPS_HNHV"
 
-filter_jmag = False
+filter_jmag = True
+jmag_min = 2  # nA/m^2
 
 sim_end = True
 
@@ -20,8 +21,8 @@ sim_end = True
 RM = 2440.0  # km
 
 # Shell limits
-rmin = 0.8 * RM
-rmax = 0.85 * RM
+rmin = 1.0 * RM
+rmax = 1.2 * RM
 
 if "Base" in case:
     input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
@@ -111,9 +112,9 @@ for step in sim_steps:
 
     if filter_jmag:
         # ------------------------
-        # FILTER STRONG CURRENTS
+        # FILTER CURRENTS
         # ------------------------
-        mask_strong = Jmag > 50
+        mask_strong = Jmag > jmag_min
         lat = lat[mask_strong]
         lon = lon[mask_strong]
         J_theta = J_theta[mask_strong]
@@ -155,7 +156,7 @@ for step in sim_steps:
     ax.set_ylim(-90,90)
     ax.set_xlabel('Longitude [°]')
     ax.set_ylabel('Latitude [°]')
-    ax.set_title(f'{case.replace("_", " ")} Current streamlines, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM at t = {step*0.002} s')
+    ax.set_title(f'{case.replace("_", " ")} current streamlines, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM at t = {step*0.002} s')
     ax.grid(True)
 
     outfile = os.path.join(output_folder, f"{case}_current_streamlines_{step}_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png")
