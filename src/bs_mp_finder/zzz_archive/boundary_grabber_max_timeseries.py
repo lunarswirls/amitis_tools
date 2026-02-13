@@ -12,7 +12,7 @@ debug = False
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_HNHV"
+case = "RPN_HNHV"
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False  # 280-300 s
@@ -73,7 +73,7 @@ PLOT_BG = {
     },
 }
 
-out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_id_timeseries/{case}/"
+out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_id_timeseries/{case}_magneticeq/"
 os.makedirs(out_dir, exist_ok=True)
 
 out_folder_ts = os.path.join(out_dir, f"timeseries_{slice_tag}/")

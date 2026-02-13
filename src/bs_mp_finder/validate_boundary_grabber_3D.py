@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-import bs_mp_finder.boundary_utils as boundary_utils
+import bs_mp_finder.boundary_utils_validate as boundary_utils
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -13,30 +13,11 @@ from plotly.subplots import make_subplots
 # ----------------------------
 debug = False
 
-# base cases: CPN_Base RPN_Base CPS_Base RPS_Base
-# HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_HNHV"
+# RBY or CBY
+case = "RBY"
 
-# FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
-transient = True  # 280-300 s
-post_transient = False  # 330-350 s
-new_state = False  # 680-700 s
-
-if "Base" in case:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
-    sim_steps = list(range(105000, 115000 + 1, 1000))
-elif "HNHV" in case:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
-    if transient and not post_transient and not new_state:
-        sim_steps = range(140000, 150000 + 1, 1000)
-    elif post_transient and not transient and not new_state:
-        sim_steps = range(165000, 175000 + 1, 1000)
-    elif new_state and not post_transient and not transient:
-        sim_steps = range(340000, 350000 + 1, 1000)
-    else:
-        raise ValueError("Too many flags! Set only one of transient, post_transient, or new_state to True")
-else:
-    raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
+input_folder = f"/Volumes/data_backup/mercury/dBdT/{case}/plane_product/object/"
+sim_steps = list(range(250000, 500000 + 1, 10000))
 
 use_slices = ["xy", "xz"]
 n_slices = len(use_slices)
@@ -629,20 +610,8 @@ fig.update_layout(
 )
 
 # Set title
-stitle = f"{case.replace('_', ' ')} - Boundary Shells"
-if "Base" in case:
-    stitle += ": Pre-Transient"
-    html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter.html")
-elif "HNHV" in case:
-    if transient:
-        stitle += ": Transient"
-        html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter_transient.html")
-    elif post_transient:
-        stitle += ": Post-Transient"
-        html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter_post-transient.html")
-    elif new_state:
-        stitle += ": New State"
-        html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter_newstate.html")
+stitle = f"{case.replace('_', ' ')} - Boundary Shell Validation"
+html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter.html")
 
 fig.update_layout(title_text=stitle, title_x=0.5, title_font_size=18)
 
@@ -721,15 +690,7 @@ records = [
 ]
 
 df = pd.DataFrame(records)
-if "Base" in case:
-    csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics.csv")
-elif "HNHV" in case:
-    if transient:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics_transient.csv")
-    elif post_transient:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics_post-transient.csv")
-    elif new_state:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics_newstate.csv")
+csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics.csv")
 
 df.to_csv(csv_path, index=False)
 print(f"Saved 3D shell statistics: {csv_path}")

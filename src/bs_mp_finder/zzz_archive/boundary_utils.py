@@ -22,10 +22,15 @@ def labels_for_slice(s: str):
 
 
 def coords_for_slice(ds: xr.Dataset, use_slice: str, RM_M=2440.0e3):
-    xmin = float(ds.full_xmin); xmax = float(ds.full_xmax)
-    ymin = float(ds.full_ymin); ymax = float(ds.full_ymax)
-    zmin = float(ds.full_zmin); zmax = float(ds.full_zmax)
-    dx = float(ds.full_dx); dy = float(ds.full_dy); dz = float(ds.full_dz)
+    xmin = float(ds.full_xmin)
+    xmax = float(ds.full_xmax)
+    ymin = float(ds.full_ymin)
+    ymax = float(ds.full_ymax)
+    zmin = float(ds.full_zmin)
+    zmax = float(ds.full_zmax)
+    dx = float(ds.full_dx)
+    dy = float(ds.full_dy)
+    dz = float(ds.full_dz)
 
     x = np.arange(xmin, xmax, dx) / RM_M
     y = np.arange(ymin, ymax, dy) / RM_M
@@ -50,7 +55,7 @@ def extract_slice_fields(ds: xr.Dataset, use_slice: str):
     """
     s = use_slice.lower().strip()
     if s == "xy":
-        sel_kw = dict(Nz=1)
+        sel_kw = dict(Nz=484.0e3)
     elif s == "xz":
         sel_kw = dict(Ny=1)
     elif s == "yz":
