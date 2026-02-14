@@ -9,12 +9,15 @@ from pyamitis.amitis_particle import *
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-cases = ["CPN_Base", "RPN_Base", "CPS_Base", "RPS_Base"]
+# precipitation test cases: inert_planetward inert_sunward
+
+# cases = ["CPN_Base", "RPN_Base", "CPS_Base", "RPS_Base"]
 # cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
+cases = ["inert_planetward", "inert_sunward"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False
-post_transient = True
+post_transient = False
 new_state = False
 
 for case in cases:
@@ -29,15 +32,21 @@ for case in cases:
             main_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/"
         else:
             raise ValueError("Too many flags! Set only one of transient, post_transient, or new_state to True")
+    elif "inert_sunward" in case:
+        main_path = f"/Users/danywaller/Projects/mercury/inert_small_body_sunward_IMF/"
+        case = "SW_IMF"
+    elif "inert_planetward" in case:
+        main_path = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/"
+        case = "PW_IMF"
     else:
-        raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
+        raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert_body files?")
 
     select_R = 2480.e3
 
-    sub_filepath = main_path + 'particles_test/'
+    sub_filepath = main_path + 'particles_1sec_n28/'
     sub_filename = f'Subset_{case}'
 
-    all_particles_directory = main_path + 'precipitation_test/'
+    all_particles_directory = main_path + 'precipitation_1sec_n28/'
     os.makedirs(all_particles_directory, exist_ok=True)
 
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"

@@ -354,10 +354,16 @@ def compute_radial_flux(all_particles_filename, sim_dx, sim_dy, sim_dz,
 
     # 3) Mass-weighted average velocity [km/s]
     # v_avg = (mass_flux / mass_count) because mass_flux = Σ(m*w*v) and mass_count = Σ(m*w)
-    v_r_map = np.zeros((n_lat, n_lon))
-    mass_threshold = 1e10  # [amu * # particles] minimum for statistics
-    valid_mask = mass_count_total > mass_threshold
+    v_r_map = np.zeros((n_lat, n_lon))  # [m/s]
+    # mass_threshold = 1e10  # [amu * # particles] minimum for statistics
+    macro_threshold = 10
+    # valid_mask = mass_count_total > mass_threshold
+    valid_mask = count_map_total > macro_threshold
     v_r_map[valid_mask] = -(mass_flux_total[valid_mask] / mass_count_total[valid_mask]) * 1e-3  # [km/s], negative for inward
+
+    # Volume flux calculation for debugging
+    # flux_map = den_map * (-v_r_map*1e3) # [m^-2 s^-1]
+    # flux_map_cm = flux_map * 1e-4  # [cm^-2 s^-1]
 
     # 4) Mass flux [amu cm^-2 s^-1]
     # Mass flux = Σ(m * w_i * |v_r,i|) / area

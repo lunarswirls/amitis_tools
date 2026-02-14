@@ -6,9 +6,15 @@ import numpy as np
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPS_Base"
+# precipitation test cases: inert_planetward inert_sunward
+case = "inert_planetward"
 
-dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
+if "Base" in case or "HNHV" in case:
+    dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
+elif "inert" in case:
+    dt = 0.02  # simulation dt defined in Amitis.inp [seconds]
+else:
+    raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert body files?")
 
 # Flags for what time range to use (also defines input and output paths)
 transient = False
@@ -35,8 +41,26 @@ elif "HNHV" in case:
         sim_steps = range(340000, 350000 + 1, 1000)  # end of simulation
     else:
         raise ValueError("Too many flags! Set only one of transient, post_transient, or new_state to True")
+elif "inert_sunward" in case:
+    folder = Path(f"/Users/danywaller/Projects/mercury/inert_small_body_sunward_IMF/subset/")
+    outdir = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/particles_1sec_n28/"
+    # outdir = f"/Users/danywaller/Projects/mercury/inert_small_body_sunward_IMF/particles_20sec_n11/"
+    # sim_steps = range(3000, 30000 + 1, 1000)
+    # sim_steps = range(20000, 30000 + 1, 1000)
+    # sim_steps = range(30000, 30500 + 1, 50)
+    sim_steps = range(30000, 31400 + 1, 50)
+    case = "SW_IMF"
+elif "inert_planetward" in case:
+    folder = Path(f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/subset/")
+    outdir = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/particles_1sec_n28/"
+    # outdir = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/particles_20sec_n11/"
+    # sim_steps = range(3000, 30000 + 1, 1000)
+    # sim_steps = range(20000, 30000 + 1, 1000)
+    # sim_steps = range(30000, 30500 + 1, 50)
+    sim_steps = range(30000, 31400 + 1, 50)
+    case = "PW_IMF"
 else:
-    raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
+    raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert_body files?")
 
 os.makedirs(outdir, exist_ok=True)
 
@@ -44,11 +68,12 @@ os.makedirs(outdir, exist_ok=True)
 x = y = z = None
 
 for sim_step in sim_steps:
-    prefix = f"Subset_{case}_{sim_step}"
+    prefix = f"Subset_{case}_" + "%06d" % sim_step
 
     # Load all NPZ chunks with memory mapping
     npz_files = sorted(folder.glob(f"{prefix}*.npz"))
     loaded = [np.load(f, mmap_mode="r") for f in npz_files]
+    print(f"Loaded {len(loaded)} files at step {sim_step*dt} s")
 
     # Compute global domain extents
     xmin = min(d["xmin"][0] for d in loaded)
