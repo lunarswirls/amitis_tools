@@ -41,12 +41,12 @@ for case in cases:
     else:
         raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert_body files?")
 
-    select_R = 2480.e3
+    select_R = 2440.e3 + 1.0
 
-    sub_filepath = main_path + 'particles_1sec_n28/'
+    sub_filepath = main_path + 'particles_1sec_n11/'
     sub_filename = f'Subset_{case}'
 
-    all_particles_directory = main_path + 'precipitation_1sec_n28/'
+    all_particles_directory = main_path + 'precipitation_1sec_n11_dR1m/'
     os.makedirs(all_particles_directory, exist_ok=True)
 
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"

@@ -19,7 +19,7 @@ for case in cases:
         main_path = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/"
         case = "PW_IMF"
 
-    output_folder = f"/Users/danywaller/Projects/mercury/precipitation_validation_test_cases_1sec_n28/"
+    output_folder = f"/Users/danywaller/Projects/mercury/precipitation_validation_test_cases_1sec_n11_dR100km/"
 
     plot_meth = "raw"  # raw, log, lognorm
     run_species = "all"  # 'all'
@@ -46,7 +46,7 @@ for case in cases:
 
     select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
 
-    all_particles_directory = main_path + 'precipitation_1sec_n28/'
+    all_particles_directory = main_path + 'precipitation_1sec_n11_dR100km/'
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
@@ -138,7 +138,7 @@ for case in cases:
         (cnts, (0, 12), "viridis", "# particles"),
         (den_cm3, (0, 100), "cividis", r"$n$ [cm$^{-3}$]"),
         (vr_abs, (0, 400), "plasma", r"$|v_r|$ [km/s]"),
-        (flux_abs, (0, 8e13), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
+        (flux_abs, (0, 2e9), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
         (mass_flux_abs, (0, 1e14), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
         (energy_flux_abs, (0, 4e16), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
     ]
@@ -170,7 +170,7 @@ for case in cases:
     else:
         raise ValueError(f"Plotting method {plot_meth} not recognized! Use one of 'raw', 'log', or 'lognorm'")
 
-    titles = ["Counts", "Shell density", "Radial velocity", "Surface flux", "Mass flux", "Energy flux"]
+    titles = ["Counts", "Shell density", "Radial velocity", "Volume flux", "Mass flux", "Energy flux"]
 
     # ---- 3. Plot in Hammer projection (3x2 layout) ----
     fig, axes = plt.subplots(
@@ -230,7 +230,7 @@ for case in cases:
         title_name = "Planetward IMF"
 
     stitle = f"{title_name}: One species (H+)"
-    plot_fname = f"{case}_cnts_den_vr_surface_flux_mass_ener_one_species_{plot_meth}vals"
+    plot_fname = f"{case}_cnts_den_vr_volume_flux_mass_ener_one_species_{plot_meth}vals"
 
     fig.suptitle(stitle, fontsize=20, y=0.97)
     plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust for suptitle
@@ -242,7 +242,7 @@ for case in cases:
     plt.close(fig)
 
     fields_raw = [
-        (flux_abs, (0, 8e13), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
+        (flux_abs, (0, 2e9), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
         (mass_flux_abs, (0, 1e14), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
         (energy_flux_abs, (0, 4e16), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
     ]
@@ -256,7 +256,7 @@ for case in cases:
     else:
         raise ValueError(f"Plotting method {plot_meth} not recognized! Use one of 'raw', 'log', or 'lognorm'")
 
-    titles = ["Surface flux", "Mass flux", "Energy flux"]
+    titles = ["Volume flux", "Mass flux", "Energy flux"]
 
     # ---- 3. Plot in Hammer projection (3x1 layout) ----
     fig, axes = plt.subplots(
@@ -315,7 +315,7 @@ for case in cases:
         title_name = "Planetward IMF"
 
     stitle = f"dt = 1 second, n = 28"
-    plot_fname = f"{case}_surface_flux_mass_ener_one_species_{plot_meth}vals_dt1_n28"
+    plot_fname = f"{case}_volume_flux_mass_ener_one_species_{plot_meth}vals_dt1_n28"
 
     fig.suptitle(
         stitle,
@@ -410,7 +410,7 @@ for case in cases:
     tests = {
         "Density": den_cm3,
         "Radial velocity": vr_abs,
-        "Surface Flux": flux_abs,
+        "Volume Flux": flux_abs,
         # "mass_flux_abs": mass_flux_abs,
         # "energy_flux_abs": energy_flux_abs,
         # "flux_norm": flux_abs / sim_flux_upstream,
