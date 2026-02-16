@@ -9,7 +9,8 @@ import src.helper_utils as helper_utils
 
 debug = True
 
-cases = ["inert_planetward", "inert_sunward"]
+# cases = ["inert_planetward", "inert_sunward"]
+cases = ["jeremias_validation"]
 
 for case in cases:
     if "inert_sunward" in case:
@@ -18,40 +19,77 @@ for case in cases:
     elif "inert_planetward" in case:
         main_path = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/"
         case = "PW_IMF"
+    elif "validation" in case:
+        main_path = f"/Volumes/data_backup/2026_02_12_LongPrecipValidation/"
+        case = "prec_valid"
 
-    output_folder = f"/Users/danywaller/Projects/mercury/precipitation_validation_test_cases_1sec_n11_dR100km/"
+    if "inert" in case:
+        output_folder = f"/Users/danywaller/Projects/mercury/precipitation_validation_test_cases_1sec_n11_dR100km/"
 
-    plot_meth = "raw"  # raw, log, lognorm
-    run_species = "all"  # 'all'
+        plot_meth = "log"  # raw, log, lognorm
+        run_species = "all"  # 'all'
 
-    outdir = output_folder + f"{run_species}"
-    os.makedirs(outdir, exist_ok=True)
+        outdir = output_folder + f"{run_species}"
+        os.makedirs(outdir, exist_ok=True)
 
-    species = np.array(['H+'])  # The order is important and it should be based on Amitis.inp file
-    sim_ppc = np.array([12])  # Number of particles per species, based on Amitis.inp
-    sim_den = np.array([40.0e6])  # [/m^3]
-    sim_vel = np.array([400.e3])  # [m/s]
+        species = np.array(['H+'])  # The order is important and it should be based on Amitis.inp file
+        sim_ppc = np.array([12])  # Number of particles per species, based on Amitis.inp
+        sim_den = np.array([40.0e6])  # [/m^3]
+        sim_vel = np.array([400.e3])  # [m/s]
 
-    # Species properties
-    species_mass = np.array([1.0])  # [amu] proton1
-    species_charge = np.array([1.0])  # [e] proton1
+        # Species properties
+        species_mass = np.array([1.0])  # [amu] proton1
+        species_charge = np.array([1.0])  # [e] proton1
 
-    sim_dx = 200.e3  # simulation cell size based on Amitis.inp [m]
-    sim_dy = 200.e3  # simulation cell size based on Amitis.inp [m]
-    sim_dz = 200.e3  # simulation cell size based on Amitis.inp [m]
-    sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
+        sim_dx = 200.e3  # simulation cell size based on Amitis.inp [m]
+        sim_dy = 200.e3  # simulation cell size based on Amitis.inp [m]
+        sim_dz = 200.e3  # simulation cell size based on Amitis.inp [m]
+        sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
 
-    nlat = 90
-    nlon = 180
+        nlat = 90
+        nlon = 180
 
-    select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
+        select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
 
-    all_particles_directory = main_path + 'precipitation_1sec_n11_dR100km/'
-    all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
+        all_particles_directory = main_path + 'precipitation_1sec_n11/'
+        all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
+    else:
+        output_folder = f"/Users/danywaller/Projects/precipitation_validation_test_case_trange10sec/"
+        # output_folder = f"/Users/danywaller/Projects/precipitation_validation_test_case/"
+
+        plot_meth = "log"  # raw, log, lognorm
+        run_species = "all"  # 'all'
+
+        outdir = output_folder
+        os.makedirs(outdir, exist_ok=True)
+
+        species = np.array(['H+'])  # The order is important and it should be based on Amitis.inp file
+        sim_ppc = np.array([15])  # Number of particles per species, based on Amitis.inp
+        sim_den = np.array([10.0e6])  # [/m^3]
+        sim_vel = np.array([400.e3])  # [m/s]
+
+        dt = 0.001
+
+        # Species properties
+        species_mass = np.array([1.0])  # [amu] proton1
+        species_charge = np.array([1.0])  # [e] proton1
+
+        sim_dx = 80.e3  # simulation cell size based on Amitis.inp [m]
+        sim_dy = 80.e3  # simulation cell size based on Amitis.inp [m]
+        sim_dz = 80.e3  # simulation cell size based on Amitis.inp [m]
+        sim_robs = 1500e3  # obstacle radius based on Amitis.inp [m]
+        select_R = 1580.e3
+
+        nlat = 90
+        nlon = 180
+
+        all_particles_directory = main_path + 'precipitation_trange10sec/'
+        all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
         flux_utils.compute_radial_flux(
             all_particles_filename=all_particles_filename,
+            dt=dt,
             sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
             sim_ppc=sim_ppc, sim_den=sim_den, spec_map=species,
             species_mass=species_mass, species_charge=species_charge,
@@ -136,20 +174,20 @@ for case in cases:
     # Define fields for plotting (6 fields in 3x2 layout)
     fields_raw = [
         (cnts, (0, 12), "viridis", "# particles"),
-        (den_cm3, (0, 100), "cividis", r"$n$ [cm$^{-3}$]"),
+        (den_cm3, (0, 10), "cividis", r"$n$ [cm$^{-3}$]"),
         (vr_abs, (0, 400), "plasma", r"$|v_r|$ [km/s]"),
-        (flux_abs, (0, 2e9), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
-        (mass_flux_abs, (0, 1e14), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
-        (energy_flux_abs, (0, 4e16), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
+        (flux_abs, (0, 5e8), "jet", r"$F_r$ [cm$^{-2}$ s$^{-1}$]"),
+        (mass_flux_abs, (0, 1e12), "copper", r"$F_{mass}$ [amu cm$^{-2}$ s$^{-1}$]"),
+        (energy_flux_abs, (0, 4e13), "inferno", r"$F_{energy}$ [eV cm$^{-2}$ s$^{-1}$]")
     ]
 
     fields_log = [
-        (cnts, (np.nanmin(cnts), np.nanmax(cnts)), "viridis", "# particles"),
-        (log_den, (np.nanmin(log_den), np.nanmax(log_den)), "cividis", r"log$_{10}$($n$) [cm$^{-3}$]"),
-        (log_vel, (np.nanmin(log_vel), np.nanmax(log_vel)), "plasma", r"log$_{10}$($|v_r|$) [km s$^{-1}$]"),
-        (log_flx, (np.nanmin(log_flx), np.nanmax(log_flx)), "jet", r"log$_{10}$($F_r$) [cm$^{-2}$ s$^{-1}$]"),
-        (log_mass_flux, (np.nanmin(log_mass_flux), np.nanmax(log_mass_flux)), "copper", r"log$_{10}$($F_{mass}$) [amu cm$^{-2}$ s$^{-1}$]"),
-        (log_energy_flux, (np.nanmin(log_energy_flux), np.nanmax(log_energy_flux)), "inferno", r"log$_{10}$($F_{energy}$) [eV cm$^{-2}$ s$^{-1}$]")
+        (cnts, (0, 12), "viridis", "# particles"),
+        (log_den, (0, 10), "cividis", r"log$_{10}$($n$) [cm$^{-3}$]"),
+        (log_vel, (0, 400), "plasma", r"log$_{10}$($|v_r|$) [km s$^{-1}$]"),
+        (log_flx, (0, 8.5), "jet", r"log$_{10}$($F_r$) [cm$^{-2}$ s$^{-1}$]"),
+        (log_mass_flux, (0, 12), "copper", r"log$_{10}$($F_{mass}$) [amu cm$^{-2}$ s$^{-1}$]"),
+        (log_energy_flux, (0, 13), "inferno", r"log$_{10}$($F_{energy}$) [eV cm$^{-2}$ s$^{-1}$]")
     ]
 
     fields_log_norm = [
@@ -170,7 +208,7 @@ for case in cases:
     else:
         raise ValueError(f"Plotting method {plot_meth} not recognized! Use one of 'raw', 'log', or 'lognorm'")
 
-    titles = ["Counts", "Shell density", "Radial velocity", "Volume flux", "Mass flux", "Energy flux"]
+    titles = ["Counts", "Shell density", "Radial velocity", "Precipitation", "Mass flux", "Energy flux"]
 
     # ---- 3. Plot in Hammer projection (3x2 layout) ----
     fig, axes = plt.subplots(
@@ -228,9 +266,11 @@ for case in cases:
         title_name = "Sunward IMF"
     if "PW" in case:
         title_name = "Planetward IMF"
+    else:
+        title_name = "Validation"
 
     stitle = f"{title_name}: One species (H+)"
-    plot_fname = f"{case}_cnts_den_vr_volume_flux_mass_ener_one_species_{plot_meth}vals"
+    plot_fname = f"{case}_cnts_den_vr_precipitation_mass_ener_one_species_{plot_meth}vals"
 
     fig.suptitle(stitle, fontsize=20, y=0.97)
     plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust for suptitle
@@ -256,7 +296,7 @@ for case in cases:
     else:
         raise ValueError(f"Plotting method {plot_meth} not recognized! Use one of 'raw', 'log', or 'lognorm'")
 
-    titles = ["Volume flux", "Mass flux", "Energy flux"]
+    titles = ["Precipitation", "Mass flux", "Energy flux"]
 
     # ---- 3. Plot in Hammer projection (3x1 layout) ----
     fig, axes = plt.subplots(
@@ -313,9 +353,12 @@ for case in cases:
         title_name = "Sunward IMF"
     if "PW" in case:
         title_name = "Planetward IMF"
+    else:
+        title_name = "Validation"
 
-    stitle = f"dt = 1 second, n = 28"
-    plot_fname = f"{case}_volume_flux_mass_ener_one_species_{plot_meth}vals_dt1_n28"
+    # stitle = f"dt = 1 second, n = 28"
+    stitle = title_name
+    plot_fname = f"{case}_precipitation_mass_ener_one_species_{plot_meth}vals"
 
     fig.suptitle(
         stitle,

@@ -37,16 +37,22 @@ for case in cases:
     elif "inert_planetward" in case:
         main_path = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/"
         case = "PW_IMF"
+    elif "validation" in case:
+        main_path = f"/Volumes/data_backup/2026_02_12_LongPrecipValidation/"
+        case = "prec_valid"
 
-    output_folder = f"/Users/danywaller/Projects/mercury/precipitation_validation_test_cases_1sec_n28_timestep_avg/"
+    if "inert" in case:
+        output_folder = f"/Users/danywaller/Projects/mercury/precipitation_validation_test_cases_1sec_n28_timestep_avg/"
+        all_particles_directory = main_path + 'particles_1sec_n28/'
+    else:
+        output_folder = f"/Users/danywaller/Projects/precipitation_validation_test_case_timestep_avg/"
+        all_particles_directory = main_path + 'particles/'
 
     plot_meth = "raw"  # raw, log, lognorm
     run_species = "all"  # 'all'
 
     outdir = output_folder + f"{run_species}"
     os.makedirs(outdir, exist_ok=True)
-
-    all_particles_directory = main_path + 'particles_1sec_n28/'
 
     sim_steps = list(range(30000, 31400 + 1, 50))
 

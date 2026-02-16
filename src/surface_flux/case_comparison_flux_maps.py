@@ -21,8 +21,8 @@ output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitati
 debug = False
 footprints = False
 
-plot_meth = "raw"  # raw, log, lognorm
-run_species = "all"  # 'all' or 'protons' or 'alphas'
+plot_meth = "log"  # raw, log, lognorm
+run_species = "alphas"  # 'all' or 'protons' or 'alphas'
 
 outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/{run_species}"
 os.makedirs(outdir, exist_ok=True)
@@ -41,6 +41,8 @@ sim_robs = 2440.e3  # obstacle radius based on Amitis.inp [m]
 
 nlat = 90
 nlon = 180
+
+dt = 20  # physical seconds over which particle files are summed
 
 select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection [m]
 
@@ -63,13 +65,13 @@ for case in cases:
     else:
         raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
 
-    all_particles_directory = main_path + 'precipitation_test/'
+    all_particles_directory = main_path + 'precipitation/'
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
         flux_utils.compute_radial_flux(
             all_particles_filename=all_particles_filename,
-            sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
+            dt=dt, sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
             sim_ppc=sim_ppc, sim_den=sim_den, spec_map=species,
             species_mass=species_mass, species_charge=species_charge,
             R_M=sim_robs, select_R=select_R,
@@ -208,19 +210,24 @@ for case in cases:
     if "Base" in case:
         if plot_meth == "raw":
             data = flux_abs
-            c_min = 0.5e2
-            c_max = 1.5e10
+            c_min = 1.0e5
+            c_max = 1.0e9
             ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
         elif plot_meth == "log":
             data = log_flx
-            c_min = 3.5
-            c_max = 9.5
+            if not "alphas" in run_species:
+                c_min = 4
+                c_max = 10
+            else:
+                c_min = 4
+                c_max = 8.5
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
             c_min = 0.0
             c_max = 5.0
             ax_lab = r"$\log_{10}$(F/F$_0$)"
+
     elif "HNHV" in case and not new_state:
         if plot_meth == "raw":
             data = flux_abs
@@ -229,8 +236,12 @@ for case in cases:
             ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
         elif plot_meth == "log":
             data = log_flx
-            c_min = 3.5
-            c_max = 9.5
+            if not "alphas" in run_species:
+                c_min = 4
+                c_max = 10
+            else:
+                c_min = 4
+                c_max = 8.5
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
@@ -246,8 +257,12 @@ for case in cases:
             ax_lab = r"F [cm$^{-2}$ s$^{-1}$]"
         elif plot_meth == "log":
             data = log_flx
-            c_min = 3.5
-            c_max = 9.5
+            if not "alphas" in run_species:
+                c_min = 4
+                c_max = 10
+            else:
+                c_min = 4
+                c_max = 8.5
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
@@ -287,7 +302,7 @@ for case in cases:
     ax.set_title(case.split("_")[0])
 
 if "Base" in cases[0]:
-    outfname = f"all_cases_{run_species}_surface_precipitation_pre-transient_{plot_meth}.png"
+    outfname = f"all_cases_{run_species}_volume_flux_pre-transient_{plot_meth}.png"
     if run_species == "all":
         stitle = f"Pre-Transient (All species)"
     elif run_species == "protons":
@@ -295,7 +310,7 @@ if "Base" in cases[0]:
     elif run_species == "alphas":
         stitle = f"Pre-Transient (He++)"
 elif "HNHV" in cases[0] and transient:
-    outfname = f"all_cases_{run_species}_surface_precipitation_transient_{plot_meth}.png"
+    outfname = f"all_cases_{run_species}_volume_flux_transient_{plot_meth}.png"
     if run_species == "all":
         stitle = f"Transient (All species)"
     elif run_species == "protons":
@@ -303,7 +318,7 @@ elif "HNHV" in cases[0] and transient:
     elif run_species == "alphas":
         stitle = f"Transient (He++)"
 elif "HNHV" in cases[0] and post_transient:
-    outfname = f"all_cases_{run_species}_surface_precipitation_post-transient_{plot_meth}.png"
+    outfname = f"all_cases_{run_species}_volume_flux_post-transient_{plot_meth}.png"
     if run_species == "all":
         stitle = f"Post-Transient (All species)"
     elif run_species == "protons":
@@ -311,7 +326,7 @@ elif "HNHV" in cases[0] and post_transient:
     elif run_species == "alphas":
         stitle = f"Post-Transient (He++)"
 elif "HNHV" in cases[0] and new_state:
-    outfname = f"all_cases_{run_species}_surface_precipitation_newstate_{plot_meth}.png"
+    outfname = f"all_cases_{run_species}_volume_flux_newstate_{plot_meth}.png"
     if run_species == "all":
         stitle = f"New state (All species)"
     elif run_species == "protons":

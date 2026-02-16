@@ -21,16 +21,18 @@ sim_robs = 2440.e3  # obstacle radius based on Amitis.inp
 nlat = 180
 nlon = 360
 
+dt = 20  # physical seconds over which particle files are summed
+
 select_R = 2480.e3  # the radius of a sphere + 1/2 grid cell above the surface for particle selection
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/"
 
-# cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
-cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
+cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
+# cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False  # 280-300 s
-post_transient = True  # 330-350 s
+post_transient = False  # 330-350 s
 new_state = False  # 680-700 s
 
 stats_cases_all = []
@@ -57,7 +59,7 @@ for case in cases:
     flux_cm, lat_centers, lon_centers, v_r_map, count_map, n_shell_map, mass_flux_map, energy_flux_map = \
         flux_utils.compute_radial_flux(
             all_particles_filename=all_particles_filename,
-            sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
+            dt=dt, sim_dx=sim_dx, sim_dy=sim_dy, sim_dz=sim_dz,
             sim_ppc=sim_ppc, sim_den=sim_den, spec_map=species,
             species_mass=species_mass, species_charge=species_charge,
             R_M=sim_robs, select_R=select_R,

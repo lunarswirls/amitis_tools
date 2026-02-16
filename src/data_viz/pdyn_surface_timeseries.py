@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # -------------------------------
 # Configuration
 # -------------------------------
-case = "CPN_HNHV"
+case = "CPS_HNHV"
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_surface/{case}/"
 os.makedirs(output_folder, exist_ok=True)
 
@@ -130,10 +130,25 @@ fig, ax1 = plt.subplots(1, 1, figsize=(8, 3))
 
 ax1.plot(timestamps, surface_pdyn_timeseries, color='#e377c2', linewidth=2.0, linestyle='-', marker='D', markersize=2)
 
+# Define time windows and add shaded boxes
+windows = [
+    (210, 230),
+    (280, 300),
+    (330, 350),
+    (680, 700)
+]
+
+# Add shaded boxes for each window
+for window_start, window_end in windows:
+    ax1.axvspan(window_start, window_end,
+                alpha=0.2,
+                color='gray')
+
 ax1.set_ylabel(r"P$_{dyn}$ [nPa]", fontsize=14)
 ax1.set_xlabel('Time [s]', fontsize=14)
 ax1.grid(True, alpha=0.3, linestyle='--')
 ax1.tick_params(labelsize=11)
+# ax1.legend(loc='best', fontsize=10)
 
 plt.title(rf"{case.replace("_", " ")} P$_{{dyn}}$, t = {timestamps[0]:.3f} - {timestamps[-1]:.3f} s")
 

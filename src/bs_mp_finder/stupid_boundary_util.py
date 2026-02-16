@@ -145,8 +145,8 @@ def find_mp_standoff_distance(x_coords, y_coords, z_coords, Jmag, equator='geogr
     # Extract current density along x-axis at y=0, z=target
     J_along_x = Jmag[:, iy_zero, iz_target]
 
-    # Only consider positive x (dayside) AND outside planet (x > 1.0 R_M)
-    valid_x_mask = (x_coords > 1.0)
+    # Only consider positive x (dayside) AND outside planet (x > (1.0 R_M - 1 grid cell))
+    valid_x_mask = (x_coords > (1.0 - 75/2440))
     x_valid = x_coords[valid_x_mask]
     J_valid = J_along_x[valid_x_mask]
 

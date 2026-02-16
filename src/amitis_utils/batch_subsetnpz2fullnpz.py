@@ -7,12 +7,14 @@ import numpy as np
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
 # precipitation test cases: inert_planetward inert_sunward
-case = "inert_planetward"
+case = "jeremias_validation"
 
 if "Base" in case or "HNHV" in case:
     dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
 elif "inert" in case:
     dt = 0.02  # simulation dt defined in Amitis.inp [seconds]
+elif "validation" in case:
+    dt = 0.001
 else:
     raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert body files?")
 
@@ -59,6 +61,11 @@ elif "inert_planetward" in case:
     # sim_steps = range(30000, 30500 + 1, 50)
     sim_steps = range(30000, 31400 + 1, 50)
     case = "PW_IMF"
+elif "validation" in case:
+    folder = Path(f"/Volumes/data_backup/2026_02_12_LongPrecipValidation/subset/")
+    outdir = f"/Volumes/data_backup/2026_02_12_LongPrecipValidation/particles/"
+    sim_steps = range(1000, 150000 + 1, 1000)
+    case = "prec_valid"
 else:
     raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert_body files?")
 

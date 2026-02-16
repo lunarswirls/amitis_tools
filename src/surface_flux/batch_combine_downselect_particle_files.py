@@ -13,7 +13,8 @@ from pyamitis.amitis_particle import *
 
 # cases = ["CPN_Base", "RPN_Base", "CPS_Base", "RPS_Base"]
 # cases = ["RPN_HNHV", "RPS_HNHV", "CPN_HNHV", "CPS_HNHV"]
-cases = ["inert_planetward", "inert_sunward"]
+# cases = ["inert_planetward", "inert_sunward"]
+cases = ["jeremias_validation"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False
@@ -38,17 +39,26 @@ for case in cases:
     elif "inert_planetward" in case:
         main_path = f"/Users/danywaller/Projects/mercury/inert_small_body_planetward_IMF/"
         case = "PW_IMF"
+    elif "validation" in case:
+        main_path = f"/Volumes/data_backup/2026_02_12_LongPrecipValidation/"
+        case = "prec_valid"
     else:
         raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert_body files?")
 
-    select_R = 2440.e3 + 1.0
+    # select_R = 2440.e3 + 40.0e3
+    select_R = 1580.e3  # for Jay's case, R = 1500e3
 
-    sub_filepath = main_path + 'particles_1sec_n11/'
+    # sub_filepath = main_path + 'particles_1sec_n11/'
+    # sub_filename = f'Subset_{case}'
+    sub_filepath = main_path + 'particles_trange10sec/'
     sub_filename = f'Subset_{case}'
 
-    all_particles_directory = main_path + 'precipitation_1sec_n11_dR1m/'
+    # all_particles_directory = main_path + 'precipitation_1sec_n11_dR1m/'
+    # os.makedirs(all_particles_directory, exist_ok=True)
+    all_particles_directory = main_path + 'precipitation_trange10sec/'
     os.makedirs(all_particles_directory, exist_ok=True)
 
+    # all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
     all_particles_filename = all_particles_directory + f"{case}_all_particles_at_surface.npz"
 
     subset_filelist = np.array(sorted(glob.glob(sub_filepath + sub_filename + "*.npz")))
