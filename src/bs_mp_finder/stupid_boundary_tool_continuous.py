@@ -19,15 +19,17 @@ case = "RPN"
 
 if "RP" in case or "CP" in case:
     # sim_steps = list(range(105000, 350000 + 1, 1000))
-    sim_steps = list(range(0, 350000 + 1, 1000))
+    sim_steps = list(range(75000, 350000 + 1, 1000))
     file_list = []
     for sim_step in sim_steps:
         if sim_step < 115000:
             input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/object/"
+            # input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/all_xy/"
             filename = f"{sim_step:06d}"
             f_3d = os.path.join(input_folder, f"Amitis_{case}_Base_{filename}_xz_comp.nc")
         else:
             input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/plane_product/object/"
+            # input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/plane_product/all_xy/"
             filename = f"{sim_step:06d}"
             f_3d = os.path.join(input_folder, f"Amitis_{case}_HNHV_{filename}_xz_comp.nc")
         file_list.append(f_3d)

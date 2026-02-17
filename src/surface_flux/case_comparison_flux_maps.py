@@ -8,21 +8,21 @@ import src.surface_flux.flux_utils as flux_utils
 import src.helper_utils as helper_utils
 
 # SETTINGS
-cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
-# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+# cases = ["RPS_Base", "CPS_Base", "RPN_Base", "CPN_Base"]
+cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = False  # 280-300 s
 post_transient = False  # 330-350 s
-new_state = False  # 680-700 s
+new_state = True  # 680-700 s
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/"
 
 debug = False
 footprints = False
 
-plot_meth = "log"  # raw, log, lognorm
-run_species = "alphas"  # 'all' or 'protons' or 'alphas'
+plot_meth = "lognorm"  # raw, log, lognorm
+run_species = "all"  # 'all' or 'protons' or 'alphas'
 
 outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/{run_species}"
 os.makedirs(outdir, exist_ok=True)
@@ -224,8 +224,8 @@ for case in cases:
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
-            c_min = 0.0
-            c_max = 5.0
+            c_min = -4.0
+            c_max = 0.5
             ax_lab = r"$\log_{10}$(F/F$_0$)"
 
     elif "HNHV" in case and not new_state:
@@ -245,8 +245,8 @@ for case in cases:
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
-            c_min = 0.0
-            c_max = 5.0
+            c_min = -4.0
+            c_max = 0.5
             ax_lab = r"$\log_{10}$(F/F$_0$)"
 
     elif "HNHV" in case and new_state:
@@ -266,8 +266,8 @@ for case in cases:
             ax_lab = r"$\log_{10}$(F [cm$^{-2}$ s$^{-1}$])"
         elif plot_meth == "lognorm":
             data = log_flx_norm
-            c_min = 0.0
-            c_max = 5.0
+            c_min = -4.0
+            c_max = 0.5
             ax_lab = r"$\log_{10}$(F/F$_0$)"
 
     ax = axs[row, col]
