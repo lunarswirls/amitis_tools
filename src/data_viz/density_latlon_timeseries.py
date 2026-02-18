@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
 
 # SETTINGS
-case = "CPS_HNHV"
+case = "RPS_HNHV"
 
 sim_end = True
 
@@ -16,8 +16,8 @@ sim_end = True
 RM = 2440.0  # km
 
 # Shell limits
-rmin = 1.05 * RM
-rmax = 1.10 * RM
+rmin = "1.00"
+rmax = "1.05"
 
 if "Base" in case:
     input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
@@ -34,7 +34,12 @@ elif "HNHV" in case and sim_end:
 else:
     raise ValueError("Case not recognized")
 
+output_folder += f"/{rmin}-{rmax}_RM/"
 os.makedirs(output_folder, exist_ok=True)
+os.makedirs(output_folder, exist_ok=True)
+
+rmin = float(rmin) * RM
+rmax = float(rmax) * RM
 
 for step in sim_steps:
 
@@ -114,16 +119,27 @@ for step in sim_steps:
     log_den_grid = np.log10(np.maximum(tot_den_grid, 1e-10))
 
     # Streamplot works on regular grid
-    fig, ax = plt.subplots(figsize=(12,6))
-    im = ax.pcolormesh(lon_grid, lat_grid, tot_den_grid, cmap='plasma', shading='auto', vmin=0, vmax=500)
+    fig, ax = plt.subplots(figsize=(12,6), subplot_kw={"projection": "hammer"})
+    im = ax.pcolormesh(np.deg2rad(lon_grid), np.deg2rad(lat_grid), tot_den_grid, cmap='plasma', shading='auto', vmin=0, vmax=500)
 
     # plt.colorbar(im, ax=ax, label=r'$\log_{10}$(density) [cm$^{-3}$]')
     plt.colorbar(im, ax=ax, label=r'N [cm$^{-3}$]')
 
-    ax.set_xlim(-180,180)
-    ax.set_ylim(-90,90)
-    ax.set_xlabel('Longitude [°]')
-    ax.set_ylabel('Latitude [°]')
+    # Longitude ticks (-170 to 170 every n °)
+    lon_ticks_deg = np.arange(-120, 121, 60)
+    lon_ticks_rad = np.deg2rad(lon_ticks_deg)
+
+    # Latitude ticks (-90 to 90 every n °)
+    lat_ticks_deg = np.arange(-60, 61, 30)
+    lat_ticks_rad = np.deg2rad(lat_ticks_deg)
+
+    # Apply to the current axis
+    ax.set_xticks(lon_ticks_rad)
+    ax.set_yticks(lat_ticks_rad)
+
+    # Label ticks in degrees
+    ax.set_xticklabels([f"{int(l)}°" for l in lon_ticks_deg])
+    ax.set_yticklabels([f"{int(l)}°" for l in lat_ticks_deg])
     ax.set_title(f'{case.replace("_", " ")} density map, shell {rmin/RM:.2f}-{rmax/RM:.2f} RM at t = {step*0.002} s')
     ax.grid(True)
 

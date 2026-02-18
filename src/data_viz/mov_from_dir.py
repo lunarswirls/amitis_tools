@@ -3,9 +3,11 @@ import os
 import cv2
 from PIL import Image
 
-outdir = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_xy_xz_yz/"
-indir = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_xy_xz_yz/CPS_HNHV/"
-output_file = os.path.join(outdir, f"CPS_HNHV_Pdyn_full_timeseries.mov")
+case = "RPN"
+
+indir = f"/Users/danywaller/Projects/mercury/extreme/density_lonlat/{case}_HNHV_end/1.00-1.05_RM/"
+outdir = f"/Users/danywaller/Projects/mercury/extreme/density_lonlat/"
+output_file = os.path.join(outdir, f"{case}_HNHV_density_full_timeseries_1.00-1.05_RM.mov")
 
 fps = 5  # Frames per second (adjust for desired playback speed)
 

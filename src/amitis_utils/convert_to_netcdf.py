@@ -1,7 +1,7 @@
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
-case = "CPS"
+case = "RPS"
 sim_step = 350000
 filename = f'Amitis_{case}_HNHV_' + "%06d"%(sim_step)
 compress = True
@@ -65,19 +65,20 @@ if 1:
     rho_tot = obj_hdf.load_dataset('rho_tot')    # Total Charge Density: qn
     den_tot = rho_tot*1.e-6 / obj_hdf.get_mean_charge()   # calculating total number density in units of [#/cm^3]
 
-    den01 = obj_hdf.load_dataset('rho01') * 1.e-6 / obj_hdf.get_charge(1)  # [#/cm^3]
-    den02 = obj_hdf.load_dataset('rho02') * 1.e-6 / obj_hdf.get_charge(2)  # [#/cm^3]
-    den03 = obj_hdf.load_dataset('rho03') * 1.e-6 / obj_hdf.get_charge(3)  # [#/cm^3]
-    den04 = obj_hdf.load_dataset('rho04') * 1.e-6 / obj_hdf.get_charge(4)  # [#/cm^3]
+    if 0:
+        den01 = obj_hdf.load_dataset('rho01') * 1.e-6 / obj_hdf.get_charge(1)  # [#/cm^3]
+        den02 = obj_hdf.load_dataset('rho02') * 1.e-6 / obj_hdf.get_charge(2)  # [#/cm^3]
+        den03 = obj_hdf.load_dataset('rho03') * 1.e-6 / obj_hdf.get_charge(3)  # [#/cm^3]
+        den04 = obj_hdf.load_dataset('rho04') * 1.e-6 / obj_hdf.get_charge(4)  # [#/cm^3]
 
-    # Calcluate total plasma velocity
-    jix = obj_hdf.load_dataset('jix_tot')   # rho_tot * vx
-    jiy = obj_hdf.load_dataset('jiy_tot')   # rho_tot * vy
-    jiz = obj_hdf.load_dataset('jiz_tot')   # rho_tot * vz
-    vx  = jix*1.e-3 / rho_tot     # (m/s) => (km/s)
-    vy  = jiy*1.e-3 / rho_tot
-    vz  = jiz*1.e-3 / rho_tot
-    vmag = np.sqrt(vx**2 + vy**2 + vz**2)
+        # Calcluate total plasma velocity
+        jix = obj_hdf.load_dataset('jix_tot')   # rho_tot * vx
+        jiy = obj_hdf.load_dataset('jiy_tot')   # rho_tot * vy
+        jiz = obj_hdf.load_dataset('jiz_tot')   # rho_tot * vz
+        vx  = jix*1.e-3 / rho_tot     # (m/s) => (km/s)
+        vy  = jiy*1.e-3 / rho_tot
+        vz  = jiz*1.e-3 / rho_tot
+        vmag = np.sqrt(vx**2 + vy**2 + vz**2)
 
     # Electric current density from Ampere's law
     Jx = obj_hdf.load_dataset('Jx', 1.0e9)  # (A/m^2) => (nA/m^2)
@@ -107,17 +108,18 @@ obj_netcdf.write(bz      , 'Bz'      , 'nT'  )
 obj_netcdf.write(bmag    , 'Bmag'    , 'nT'  )
 
 if 1:
-    obj_netcdf.write(den01, 'den01', 'cm-3')
-    obj_netcdf.write(den02, 'den02', 'cm-3')
-    obj_netcdf.write(den03, 'den03', 'cm-3')
-    obj_netcdf.write(den04, 'den04', 'cm-3')
-
     obj_netcdf.write(den_tot , 'den_tot' , 'cm-3')
 
-    obj_netcdf.write(vx      , 'vx_tot'  , 'km/s')
-    obj_netcdf.write(vy      , 'vy_tot'  , 'km/s')
-    obj_netcdf.write(vz      , 'vz_tot'  , 'km/s')
-    obj_netcdf.write(vmag    , 'vmag'    , 'km/s')
+    if 0:
+        obj_netcdf.write(den01, 'den01', 'cm-3')
+        obj_netcdf.write(den02, 'den02', 'cm-3')
+        obj_netcdf.write(den03, 'den03', 'cm-3')
+        obj_netcdf.write(den04, 'den04', 'cm-3')
+
+        obj_netcdf.write(vx      , 'vx_tot'  , 'km/s')
+        obj_netcdf.write(vy      , 'vy_tot'  , 'km/s')
+        obj_netcdf.write(vz      , 'vz_tot'  , 'km/s')
+        obj_netcdf.write(vmag    , 'vmag'    , 'km/s')
 
     obj_netcdf.write(Jx      , 'Jx'      , 'nA/m^2'  )
     obj_netcdf.write(Jy      , 'Jy'      , 'nA/m^2'  )
