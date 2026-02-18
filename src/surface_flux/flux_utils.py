@@ -16,6 +16,8 @@ def compute_radial_flux(all_particles_filename, dt, sim_dx, sim_dy, sim_dz,
     ----------
     all_particles_filename : str
         Numpy .npz file containing all particles.
+    dt : float
+        Physical time in seconds of integration of collected particles.
     sim_dx, sim_dy, sim_dz : float
         Simulation grid cell resolution [m].
     sim_ppc : array-like

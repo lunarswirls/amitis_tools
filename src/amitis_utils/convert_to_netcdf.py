@@ -1,7 +1,7 @@
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
-case = "RPS"
+case = "RPN"
 sim_step = 350000
 filename = f'Amitis_{case}_HNHV_' + "%06d"%(sim_step)
 compress = True
