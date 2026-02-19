@@ -76,9 +76,9 @@ def load_field(ncfile):
     z = ds["Nz"].values
 
     # Extract fields (drop time dimension) and transpose:  Nz, Ny, Nx --> Nx, Ny, Nz
-    Jx = np.transpose(ds["Jx"].isel(time=0).values, (2,1,0))
-    Jy = np.transpose(ds["Jy"].isel(time=0).values, (2,1,0))
-    Jz = np.transpose(ds["Jz"].isel(time=0).values, (2,1,0))
+    Jx = np.transpose(ds["Jx"].isel(time=0).values, (2,1,0))  # [nA/m^2]
+    Jy = np.transpose(ds["Jy"].isel(time=0).values, (2,1,0))  # [nA/m^2]
+    Jz = np.transpose(ds["Jz"].isel(time=0).values, (2,1,0))  # [nA/m^2]
     ds.close()
     return x, y, z, Jx, Jy, Jz
 
