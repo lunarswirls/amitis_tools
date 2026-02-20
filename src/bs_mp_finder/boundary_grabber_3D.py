@@ -15,18 +15,20 @@ debug = False
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "CPN_HNHV"
+# LNHV cases: CPS_HNHV RPS_HNHV
+case = "CPS"
+mode = "LNHV"
 
 # FOR HNHV - DOUBLE CHECK ONLY ONE IS TRUE!!!!
 transient = True  # 280-300 s
 post_transient = False  # 330-350 s
 new_state = False  # 680-700 s
 
-if "Base" in case:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
+if "Base" in mode:
+    input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/object/"
     sim_steps = list(range(105000, 115000 + 1, 1000))
-elif "HNHV" in case:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
+elif "HNHV" in mode or "LNHV" in mode:
+    input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/object/"
     if transient and not post_transient and not new_state:
         sim_steps = range(140000, 150000 + 1, 1000)
     elif post_transient and not transient and not new_state:
@@ -36,7 +38,7 @@ elif "HNHV" in case:
     else:
         raise ValueError("Too many flags! Set only one of transient, post_transient, or new_state to True")
 else:
-    raise ValueError("Unrecognized case! Are you using one of Base or HNHV?")
+    raise ValueError("Unrecognized mode! Are you using one of (Base, HNHV, LNHV)?")
 
 use_slices = ["xy", "xz"]
 n_slices = len(use_slices)
@@ -74,7 +76,7 @@ PLOT_BG = {
     },
 }
 
-out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_3D_timeseries/{case}/"
+out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_3D_timeseries/{case}_{mode}/"
 os.makedirs(out_dir, exist_ok=True)
 out_folder_ts = os.path.join(out_dir, f"timeseries_{slice_tag}/")
 os.makedirs(out_folder_ts, exist_ok=True)
@@ -94,7 +96,7 @@ acc_3d = {
 # ----------------------------
 for sim_step in sim_steps:
     filename = f"{sim_step:06d}"
-    f_3d = os.path.join(input_folder, f"Amitis_{case}_{filename}_xz_comp.nc")
+    f_3d = os.path.join(input_folder, f"Amitis_{case}_{mode}_{filename}_xz_comp.nc")
 
     if not os.path.exists(f_3d):
         print(f"[WARN] missing 3D file: {f_3d}")
@@ -175,13 +177,13 @@ for sim_step in sim_steps:
 
     tsec = sim_step * 0.002
     fig.suptitle(
-        f"{case.replace('_', ' ')} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) at t = {tsec:.3f} s\n"
+        f"{case} {mode} - BS ({cfg['bs_col']}) and MP ({cfg['mp_col']}) at t = {tsec:.3f} s\n"
         f"Slice through MP max: x={mp_max_info['x_max']:.2f}, y={mp_max_info['y_max']:.2f}, "
         f"z={mp_max_info['z_max']:.2f}, r={mp_max_info['r_max']:.2f} R$_M$",
         fontsize=14, y=0.98
     )
 
-    outpath = os.path.join(out_folder_ts, f"{case}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
+    outpath = os.path.join(out_folder_ts, f"{case}_{mode}_{plot_id.lower()}_boundaries_{slice_tag}_{sim_step:06d}.png")
     fig.savefig(outpath, dpi=300)
     plt.close(fig)
 
@@ -629,20 +631,20 @@ fig.update_layout(
 )
 
 # Set title
-stitle = f"{case.replace('_', ' ')} - Boundary Shells"
-if "Base" in case:
+stitle = f"{case} {mode} - Boundary Shells"
+if "Base" in mode:
     stitle += ": Pre-Transient"
-    html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter.html")
-elif "HNHV" in case:
+    html_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_cumulative_scatter.html")
+elif "HNHV" in mode or "LNHV" in mode:
     if transient:
         stitle += ": Transient"
-        html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter_transient.html")
+        html_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_cumulative_scatter_transient.html")
     elif post_transient:
         stitle += ": Post-Transient"
-        html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter_post-transient.html")
+        html_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_cumulative_scatter_post-transient.html")
     elif new_state:
         stitle += ": New State"
-        html_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_cumulative_scatter_newstate.html")
+        html_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_cumulative_scatter_newstate.html")
 
 fig.update_layout(title_text=stitle, title_x=0.5, title_font_size=18)
 
@@ -721,15 +723,15 @@ records = [
 ]
 
 df = pd.DataFrame(records)
-if "Base" in case:
-    csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics.csv")
-elif "HNHV" in case:
+if "Base" in mode:
+    csv_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_shell_statistics.csv")
+elif "HNHV" in mode or "LNHV" in mode:
     if transient:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics_transient.csv")
+        csv_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_shell_statistics_transient.csv")
     elif post_transient:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics_post-transient.csv")
+        csv_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_shell_statistics_post-transient.csv")
     elif new_state:
-        csv_path = os.path.join(out_dir, f"{case}_{plot_id.lower()}_3D_shell_statistics_newstate.csv")
+        csv_path = os.path.join(out_dir, f"{case}_{mode}_{plot_id.lower()}_3D_shell_statistics_newstate.csv")
 
 df.to_csv(csv_path, index=False)
 print(f"Saved 3D shell statistics: {csv_path}")

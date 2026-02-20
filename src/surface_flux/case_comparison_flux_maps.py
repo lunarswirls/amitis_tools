@@ -16,7 +16,7 @@ transient = False  # 280-300 s
 post_transient = False  # 330-350 s
 new_state = True  # 680-700 s
 
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/"
 
 debug = False
 footprints = False
@@ -24,7 +24,7 @@ footprints = False
 plot_meth = "lognorm"  # raw, log, lognorm
 run_species = "all"  # 'all' or 'protons' or 'alphas'
 
-outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation_test/{run_species}"
+outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_precipitation/{run_species}"
 os.makedirs(outdir, exist_ok=True)
 
 species = np.array(['H+', 'H+', 'He++', 'He++'])  # The order is important and it should be based on Amitis.inp file

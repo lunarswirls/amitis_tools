@@ -11,15 +11,19 @@ from src.field_topology.topology_utils import trace_field_line_rk, classify
 # SETTINGS
 # --------------------------
 debug = False
-case = "CPN"
+case = "RPS_HNHV"
 step = 350000  # 115000 for base or 350000 for hnhv
 
 if step < 116000:
     input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/05/out/"
     ncfile = os.path.join(input_folder, f"Amitis_{case}_Base_{step}.nc")
 else:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/10/out/"
-    ncfile = os.path.join(input_folder, f"Amitis_{case}_HNHV_{step}.nc")
+    if "HN" in case:
+        input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/10/out/"
+        ncfile = os.path.join(input_folder, f"Amitis_{case}_{step}.nc")
+    elif "LN" in case:
+        input_folder = f"/Volumes/data_backup/mercury/extreme/High_LNHV/{case}/10/out/"
+        ncfile = os.path.join(input_folder, f"Amitis_{case}_{step}.nc")
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/induced_bfield_topology/{case}/"
 os.makedirs(output_folder, exist_ok=True)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Recreate a 3x3 slice figure (like the provided paper figure):
+Creates a 3x3 current slice figure:
   Row 1: equatorial plane (z=0)   -> X_MSE vs Y_MSE
   Row 2: day-night plane  (y=0)   -> X_MSE vs Z_MSE
   Row 3: terminator plane (x=0)   -> Y_MSE vs Z_MSE
@@ -18,29 +18,32 @@ from matplotlib.patches import Circle, Wedge
 # SETTINGS
 # ----------------------------
 case = "RPS"
-input_folder = f"/Users/danywaller/Projects/mercury/{case}_Base/object/"
-out_folder   = f"/Users/danywaller/Projects/mercury/{case}_Base/slice_current/"
+mode = "HNHV"
+out_folder   = f"/Users/danywaller/Projects/mercury/extreme/timeseries_3x3_current_interior/{case}_{mode}/"
 os.makedirs(out_folder, exist_ok=True)
 
-# name of variables inside the NetCDF file
+# name of variables
 VAR_U = "Jx"
 VAR_V = "Jy"
 VAR_W = "Jz"
 
 SUB = 4  # quiver subsampling
 
-# Color limits, set to None to autoscale each panel.
+# Color limits, set to None to autoscale each panel
 CLIM = (-50.0, 50.0)
 
-# If your J is not already nA/m^2, set a scale factor here.
-# Example: if J is in A/m^2, use J_SCALE = 1e9 to convert to nA/m^2.
+# if J is not already nA/m^2, set a scale factor here (if A/m^2 use J_SCALE = 1e9)
 J_SCALE = 1.0
 
-# Mercury radius
+# Mercury radius [m]
 RM_M = 2440e3
 
 # first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
-sim_steps = list(range(27000, 115000 + 1, 1000))
+sim_steps = list(range(105000, 350000 + 1, 1000))
+n_steps = len(sim_steps)
+
+# actual time array based on dt
+timestamps = np.array(sim_steps) * 0.002  # [s]
 
 # ----------------------------
 # Helpers
@@ -67,7 +70,7 @@ def _planet_disk(ax, plane: str):
     plane:
       'xy' -> split by x (night at x<0)
       'xz' -> split by x (night at x<0)
-      'yz' -> split by y (night at y<0)
+      'yz' -> none
     """
     # Base (dayside) disk
     ax.add_patch(Circle((0, 0), 1.0, facecolor="white", edgecolor="black", lw=1.0, zorder=5))
@@ -81,11 +84,18 @@ def _planet_disk(ax, plane: str):
         pass
 
 
+def _planet_outline(ax, *, r_circ=1.0, edgecolor="goldenrod", lw=1.2, zorder=7):
+    """
+    Draw only the planetary limb as a circle; interior is transparent.
+    """
+    ax.add_patch(Circle((0, 0), r_circ, facecolor="none", edgecolor=edgecolor, lw=lw, zorder=zorder))
+
+
 def _mask_inside_body(X, Y, Z):
     """Mask values inside r<1."""
-    r = np.sqrt(X**2 + Y**2)
+    r_in = np.sqrt(X**2 + Y**2)
     Zm = np.array(Z, dtype=float)
-    Zm[r < 1.0] = np.nan
+    Zm[r_in < 1.0] = np.nan
     return Zm
 
 
@@ -104,15 +114,18 @@ def plot_panel(ax, X, Y, comp, uproj, vproj, *,
                clim=None,
                cmap="RdBu_r"):
     """Single panel: pcolormesh of component + unit quivers + planet disk."""
-    comp_m = _mask_inside_body(X, Y, comp)
+    # comp_m = _mask_inside_body(X, Y, comp)
+    comp_m = comp
 
     vmin, vmax = (None, None) if clim is None else clim
     pm = ax.pcolormesh(X, Y, comp_m, shading="auto", cmap=cmap, vmin=vmin, vmax=vmax, zorder=1)
 
     # Quiver: project + normalize; subsample for readability
     uu, vv = _unit_quiver(uproj, vproj)
-    uu = _mask_inside_body(X, Y, uu)
-    vv = _mask_inside_body(X, Y, vv)
+    # uu = _mask_inside_body(X, Y, uu)
+    # vv = _mask_inside_body(X, Y, vv)
+
+    _planet_outline(ax, r_circ=1.0)
 
     ax.quiver(
         X[::SUB, ::SUB], Y[::SUB, ::SUB],
@@ -122,7 +135,7 @@ def plot_panel(ax, X, Y, comp, uproj, vproj, *,
         color="k", alpha=0.85, zorder=3
     )
 
-    _planet_disk(ax, plane=plane)
+    # _planet_disk(ax, plane=plane)
 
     ax.set_aspect("equal", adjustable="box")
     ax.set_title(title, fontsize=10)
@@ -139,8 +152,16 @@ def plot_panel(ax, X, Y, comp, uproj, vproj, *,
 # Main loop
 # ----------------------------
 for sim_step in sim_steps:
-    filename = "Base_" + f"{sim_step:06d}"
-    f = os.path.join(input_folder, f"Amitis_{case}_{filename}_xz_comp.nc")
+    if sim_step < 115000:
+        input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/object/"
+        f = os.path.join(input_folder, f"Amitis_{case}_Base_{sim_step:06d}_xz_comp.nc")
+    else:
+        input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/object/"
+        f = os.path.join(input_folder, f"Amitis_{case}_{mode}_{sim_step:06d}_xz_comp.nc")
+
+    if not os.path.exists(f):
+        print(f"Warning: {f} not found, skipping...")
+        continue
 
     print(f"Processing {os.path.basename(f)} ...")
     ds = xr.open_dataset(f)
@@ -192,7 +213,7 @@ for sim_step in sim_steps:
     fig, axes = plt.subplots(3, 3, figsize=(11, 10), constrained_layout=True)
 
     # Column headers / colorbar labels
-    col_titles = [r"Current density, $J_x$", r"Current density, $J_y$", r"Current density, $J_z$"]
+    col_titles = [r"$J_x$", r"$J_y$", r"$J_z$"]
 
     # Row 1: equatorial (xy) quiver uses (Jx,Jy)
     pms = []
@@ -273,7 +294,7 @@ for sim_step in sim_steps:
         clim=CLIM
     ))
 
-    # Panel letters a–i (upper-left of each axes)
+    # Panel letters a–i (upper-left of each axis)
     letters = list("abcdefghi")
     k = 0
     for r in range(3):
@@ -285,13 +306,13 @@ for sim_step in sim_steps:
     # One colorbar above each column
     for c in range(3):
         cb = fig.colorbar(pms[c], ax=axes[:, c], location="top", pad=0.02, fraction=0.04, shrink=0.9)
-        cb.ax.set_title(r"nA m$^{-2}$", fontsize=9)
+        cb.ax.set_title(r"nA/m$^{2}$", fontsize=9)
 
     tsec = sim_step * 0.002
-    fig.suptitle(f"{case} Current density slices at t = {tsec:.3f} s ({filename})", fontsize=12)
+    fig.suptitle(f"{case} {mode} Current density slices at t = {tsec:.1f} s", fontsize=12)
 
     # Save
-    outpath = os.path.join(out_folder, f"{case}_current_slices_{sim_step:06d}.png")
+    outpath = os.path.join(out_folder, f"{case}_{mode}_current_slices_{sim_step:06d}.png")
     fig.savefig(outpath, dpi=300)
     plt.close(fig)
     ds.close()

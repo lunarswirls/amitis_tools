@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 # -------------------------------
 # Configuration
 # -------------------------------
-case = "CPS_HNHV"
-output_folder = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_surface/{case}/"
+case = "RPS"
+mode = "LNHV"
+output_folder = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_surface/{case}_{mode}/"
 os.makedirs(output_folder, exist_ok=True)
 
 R_M = 2440.0  # Mercury radius [km]
@@ -39,6 +40,10 @@ if "CPN" in case:
     print(f"Case: Conductive Core under Planetward/Northward IMF")
 elif "CPS" in case:
     print(f"Case: Conductive Core under Planetward/Southward IMF")
+if "HNHV" in mode:
+    print(f"Mode: High Density High Velocity")
+elif "LNHV" in mode:
+    print(f"Mode: Low Density High Velocity")
 print(f"   Number of steps: {n_steps}")
 print(f"   Total time span: {timestamps[-1] - timestamps[0]} s = {(timestamps[-1] - timestamps[0]) / 60:.2f} min\n")
 
@@ -47,13 +52,11 @@ surface_pdyn_timeseries = []
 
 for i, sim_step in enumerate(sim_steps):
     if sim_step < 115000:
-        case = case.replace("HNHV", "Base")
-        input_folder1 = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
+        input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/object/"
+        nc_file = os.path.join(input_folder, f"Amitis_{case}_Base_{sim_step:06d}_xz_comp.nc")
     else:
-        case = case.replace("Base", "HNHV")
-        input_folder1 = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
-
-    nc_file = os.path.join(input_folder1, f"Amitis_{case}_{sim_step:06d}_xz_comp.nc")
+        input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/object/"
+        nc_file = os.path.join(input_folder, f"Amitis_{case}_{mode}_{sim_step:06d}_xz_comp.nc")
 
     if not os.path.exists(nc_file):
         print(f"Warning: {nc_file} not found, skipping...")
@@ -150,7 +153,7 @@ ax1.grid(True, alpha=0.3, linestyle='--')
 ax1.tick_params(labelsize=11)
 # ax1.legend(loc='best', fontsize=10)
 
-plt.title(rf"{case.replace("_", " ")} P$_{{dyn}}$, t = {timestamps[0]:.3f} - {timestamps[-1]:.3f} s")
+plt.title(rf"{case} {mode} P$_{{dyn}}$, t = {timestamps[0]:.3f} - {timestamps[-1]:.3f} s")
 
 plt.tight_layout()
-plt.savefig(os.path.join(output_folder, f'{case}_pdyn_timeseries.png'), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(output_folder, f'{case}_{mode}_pdyn_timeseries.png'), dpi=300, bbox_inches='tight')

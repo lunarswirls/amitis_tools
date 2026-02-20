@@ -8,20 +8,16 @@ import matplotlib.pyplot as plt
 
 # base cases: CPN_Base RPN_Base CPS_Base RPS_Base
 # HNHV cases: CPN_HNHV RPN_HNHV CPS_HNHV RPS_HNHV
-case = "RPN_HNHV"
+case = "RPS"
+mode = "LNHV"
 
 use_slices = ["xy", "xz", "yz"]  # plot all 3
 n_slices = len(use_slices)       # number of requested slices
 slice_tag = "_".join(use_slices)
 
-if "Base" in case:
-    base_in_dir = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/"
-    c_max = 120
-elif "HNHV" in case:
-    base_in_dir = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/"
-    c_max = 400
+c_max = 400
 
-out_folder = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_{slice_tag}/{case}/"
+out_folder = f"/Users/danywaller/Projects/mercury/extreme/timeseries_pdyn_{slice_tag}/{case}_{mode}/"
 os.makedirs(out_folder, exist_ok=True)
 
 # proton mass [kg]
@@ -30,13 +26,11 @@ M_P = 1.6726e-27
 # radius of Mercury [meters]
 R_M = 2440.0e3
 
-# first stable timestamp approx. 25000 for dt=0.002, numsteps=115000
-if "Base" in case:
-    # take last 10-ish seconds
-    sim_steps = range(98000, 115000 + 1, 1000)
-elif "HNHV" in case:
-    sim_steps = range(115000, 350000 + 1, 1000)
+sim_steps = list(range(105000, 350000 + 1, 1000))
+n_steps = len(sim_steps)
 
+# actual time array based on dt
+timestamps = np.array(sim_steps) * 0.002  # [s]
 
 # ----------------------------
 # Helpers
@@ -108,19 +102,25 @@ def extract_slice_fields(ds: xr.Dataset, use_slice: str):
     return vmag, tot_den
 
 for sim_step in sim_steps:
+
     filetime = f"{sim_step:06d}"
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 6), constrained_layout=True)
     last_im = None
 
     for ax, use_slice in zip(axes, use_slices):
-        input_folder = os.path.join(base_in_dir, f"fig_{use_slice}")
-        f = os.path.join(input_folder, f"Amitis_{case}_{filetime}_{use_slice}_comp.nc")
+        if sim_step < 115000:
+            base_in_dir = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/fig_{use_slice}/"
+            f = os.path.join(base_in_dir, f"Amitis_{case}_Base_{filetime}_{use_slice}_comp.nc")
+        else:
+            base_in_dir = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/"
+            input_folder = os.path.join(base_in_dir, f"fig_{use_slice}")
+            f = os.path.join(input_folder, f"Amitis_{case}_{mode}_{filetime}_{use_slice}_comp.nc")
 
         if not os.path.exists(f):
             ax.axis("off")
             ax.set_title(f"{use_slice.upper()} missing")
-            print(f"[WARN] missing: {f}")
+            print(f"Warning: {f} not found, skipping...")
             continue
 
         ds = xr.open_dataset(f)
@@ -152,9 +152,9 @@ for sim_step in sim_steps:
         cbar = fig.colorbar(last_im, ax=axes, location="right", shrink=0.9)
         cbar.set_label(r"$P_{dyn}$ [nPa]")
 
-    fig.suptitle(rf"{case.replace("_"," ")} $P_{{dyn}}$ at t = {sim_step * 0.002:.3f} s", fontsize=18, y=0.99)
+    fig.suptitle(rf"{case} {mode} $P_{{dyn}}$ at t = {sim_step * 0.002:.3f} s", fontsize=18, y=0.99)
     # plt.tight_layout()
-    fig_path = os.path.join(out_folder, f"{case}_pdyn_{sim_step}.png")
+    fig_path = os.path.join(out_folder, f"{case}_{mode}_pdyn_{sim_step}.png")
     plt.savefig(fig_path, dpi=300, bbox_inches='tight')
     plt.close()
 

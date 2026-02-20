@@ -15,7 +15,10 @@ debug = False
 
 # extreme cases: CPN RPN CPS RPS
 # dBdt cases: RBY, CBY
-case = "RPN"
+case = "RPS"
+
+# mode: LNHV, HNHV, V
+mode = "V"
 
 if "RP" in case or "CP" in case:
     # sim_steps = list(range(105000, 350000 + 1, 1000))
@@ -28,10 +31,13 @@ if "RP" in case or "CP" in case:
             filename = f"{sim_step:06d}"
             f_3d = os.path.join(input_folder, f"Amitis_{case}_Base_{filename}_xz_comp.nc")
         else:
-            input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/plane_product/object/"
+            input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/object/"
             # input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}_HNHV/plane_product/all_xy/"
             filename = f"{sim_step:06d}"
-            f_3d = os.path.join(input_folder, f"Amitis_{case}_HNHV_{filename}_xz_comp.nc")
+            if mode == "V":
+                f_3d = os.path.join(input_folder, f"Amitis_{case}_H{mode}_{filename}_xz_comp.nc")
+            else:
+                f_3d = os.path.join(input_folder, f"Amitis_{case}_{mode}_{filename}_xz_comp.nc")
         file_list.append(f_3d)
 elif "Y" in case:
     input_folder = f"/Volumes/data_backup/mercury/dBdT/{case}/plane_product/object/"
@@ -42,7 +48,7 @@ elif "Y" in case:
         f_3d = os.path.join(input_folder, f"Amitis_{case}_{filename}_xz_comp.nc")
         file_list.append(f_3d)
 else:
-    raise ValueError("Unrecognized case! Are you using a case from Base, HNHV, or dBdt?")
+    raise ValueError("Unrecognized case! Are you using a case from Base, HNHV, LNHV, or dBdt?")
 
 plot_id = "Pmag"  # Using current density for standoff distance calculation
 
@@ -76,7 +82,7 @@ PLOT_BG = {
     },
 }
 
-out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_3D_timeseries/{case}_standoff/"
+out_dir = f"/Users/danywaller/Projects/mercury/extreme/boundary_3D_timeseries/{case}_{mode}_standoff/"
 os.makedirs(out_dir, exist_ok=True)
 
 RM_M = 2440.0e3
@@ -192,7 +198,7 @@ def calculate_window_stats(timestamps, standoff_data, window_start, window_end):
 
 
 print("\n" + "=" * 70)
-print(f"{case} - Magnetopause Standoff Distance Statistics (Windowed)")
+print(f"{case} {mode} - Magnetopause Standoff Distance Statistics (Windowed)")
 print("=" * 70)
 
 # Calculate and print statistics for each window
@@ -239,7 +245,7 @@ ts_df = pd.DataFrame({
     'mag_standoff_km': standoff_mag * 2440
 })
 
-ts_csv = os.path.join(out_dir, f"{case}_standoff_timeseries.csv")
+ts_csv = os.path.join(out_dir, f"{case}_{mode}_standoff_timeseries.csv")
 
 ts_df.to_csv(ts_csv, index=False)
 print(f"\nSaved timeseries: {ts_csv}")
@@ -262,13 +268,13 @@ if 0:
 
 ax.set_xlabel('Time (s)', fontsize=14)
 ax.set_ylabel('Standoff Distance (R$_M$)', fontsize=14)
-ax.set_title(f'{case} - Magnetopause Standoff Distance Evolution', fontsize=16)
+ax.set_title(f'{case} {mode} - Magnetopause Standoff Distance Evolution', fontsize=16)
 ax.legend(fontsize=12)
 ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
 
-plot_path = os.path.join(out_dir, f"{case}_standoff_timeseries.png")
+plot_path = os.path.join(out_dir, f"{case}_{mode}_standoff_timeseries.png")
 
 plt.savefig(plot_path, dpi=300, bbox_inches='tight')
 print(f"Saved plot: {plot_path}")
