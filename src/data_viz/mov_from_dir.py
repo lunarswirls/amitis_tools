@@ -3,11 +3,11 @@ import os
 import cv2
 from PIL import Image
 
-case = "RPN"
+case = "CPN_HNHV"
 
-indir = f"/Users/danywaller/Projects/mercury/extreme/density_lonlat/{case}_HNHV_end/1.00-1.05_RM/"
-outdir = f"/Users/danywaller/Projects/mercury/extreme/density_lonlat/"
-output_file = os.path.join(outdir, f"{case}_HNHV_density_full_timeseries_1.00-1.05_RM.mov")
+indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/sid03_He++/"
+outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/"
+output_file = os.path.join(outdir, f"{case}_per_timestep_sid03_He++_flux.mov")
 
 fps = 5  # Frames per second (adjust for desired playback speed)
 
