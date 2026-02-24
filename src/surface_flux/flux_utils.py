@@ -425,182 +425,182 @@ def compute_flux_statistics(flux_map, lat_centers, lon_centers, R_M,
 
     Notes
     -----
-    Assumes MSO coordinate system: +X toward Sun (subsolar at lon=0°)
-    Dayside/nightside uses proper spherical geometry (Sun above/below horizon)
+    Assumes MSO coordinate system:
+      +X toward Sun (subsolar at lon=0°)
+      +Y toward dusk (y>0 is dusk, y<0 is dawn)
+
+    Dayside/nightside uses proper spherical geometry:
+      x = cos(lat) * cos(lon)
+      dayside if x > 0, nightside if x <= 0
+
+    Dawn/dusk uses:
+      y = cos(lat) * sin(lon)
+      dusk if y > 0, dawn if y < 0
+
+    Integrated fluxes are returned in [#/s] (area-integrated).
+    Signed asymmetry indices are in [-1, +1].
     """
 
-    # Initialize statistics dictionary
     stats = {
         'case_name': case_name,
-        'total_integrated_flux': 0.0,
-        'peak_flux_value': 0.0,
-        'peak_flux_lat': 0.0,
-        'peak_flux_lon': 0.0,
-        'spatial_extent_area': 0.0,
-        'spatial_extent_percentage': 0.0,
+
+        # global
+        'total_integrated_flux': 0.0,     # [#/s]
+        'peak_flux_value': 0.0,           # [cm^-2 s^-1]
+        'peak_flux_lat': 0.0,             # [deg]
+        'peak_flux_lon': 0.0,             # [deg]
+
+        # spatial extent
+        'spatial_extent_area': 0.0,       # [m^2]
+        'spatial_extent_percentage': 0.0, # [%]
+        'threshold_used': 0.0,            # [cm^-2 s^-1]
+
+        # hemispheres (integrated [#/s])
         'northern_hemisphere_flux': 0.0,
         'southern_hemisphere_flux': 0.0,
-        'hemispheric_asymmetry_ratio': 0.0,
+        'hemispheric_asymmetry_ratio': 0.0,   # north/south
+
+        # day/night (integrated [#/s])
         'dayside_flux': 0.0,
         'nightside_flux': 0.0,
-        'dayside_nightside_ratio': 0.0,
-        'mean_flux': 0.0,
-        'median_flux': 0.0,
-        'threshold_used': 0.0
+        'dayside_nightside_ratio': 0.0,       # day/night
+        'dayside_nightside_asym_index': 0.0,  # (day-night)/(day+night)
+
+        # dawn/dusk (integrated [#/s])
+        'dawnside_flux': 0.0,
+        'duskside_flux': 0.0,
+        'dawn_dusk_ratio': 0.0,               # dawn/dusk
+        'dawn_dusk_asym_index': 0.0,          # (dawn-dusk)/(dawn+dusk)
+
+        # distribution (nonzero cells only, in input units)
+        'mean_flux': 0.0,                 # [cm^-2 s^-1]
+        'median_flux': 0.0,               # [cm^-2 s^-1]
     }
 
-    # Handle edge case of empty or all-zero flux map
-    if np.all(flux_map == 0) or np.all(np.isnan(flux_map)):
+    # Handle edge case of empty or all-NaN map
+    if np.all(np.isnan(flux_map)) or np.all(flux_map == 0):
         return stats
 
-    # Replace NaN with 0 for integration
+    # Replace NaN with 0 for integration/sums (keeps "no-data" from contributing)
     flux_map_clean = np.nan_to_num(flux_map, nan=0.0)
 
-    # Compute bin edges from centers
+    # Compute bin edges from centers (assumes regular grid)
     n_lat = len(lat_centers)
     n_lon = len(lon_centers)
 
     dlat = lat_centers[1] - lat_centers[0] if n_lat > 1 else 1.0
     dlon = lon_centers[1] - lon_centers[0] if n_lon > 1 else 1.0
 
-    # Reconstruct edges
     lat_edges = np.linspace(lat_centers[0] - dlat / 2, lat_centers[-1] + dlat / 2, n_lat + 1)
     lon_edges = np.linspace(lon_centers[0] - dlon / 2, lon_centers[-1] + dlon / 2, n_lon + 1)
 
-    # Convert to radians
+    # Convert edges to radians and compute per-bin areas
     lat_edges_rad = np.radians(lat_edges)
     lon_edges_rad = np.radians(lon_edges)
-
-    # Compute dlon in radians
     dlon_rad = lon_edges_rad[1] - lon_edges_rad[0]
 
-    # Compute area per bin [m^2]
-    # A = R^2 * dlon * (sin(lat_upper) - sin(lat_lower))
     area_per_bin = np.zeros((n_lat, n_lon))
-
     for i in range(n_lat):
-        sin_upper = np.sin(lat_edges_rad[i + 1])
-        sin_lower = np.sin(lat_edges_rad[i])
-        area_lat = R_M ** 2 * dlon_rad * (sin_upper - sin_lower)
-        area_per_bin[i, :] = area_lat
+        area_per_bin[i, :] = (R_M ** 2) * dlon_rad * (np.sin(lat_edges_rad[i + 1]) - np.sin(lat_edges_rad[i]))
 
     if debug:
-        print(f"\n{'=' * 60}")
-        print(f"DEBUG: {case_name}")
-        print(f"{'=' * 60}")
-        print(f"Grid: {n_lat} lat × {n_lon} lon")
-        print(f"Lat range: [{lat_centers[0]:.1f}, {lat_centers[-1]:.1f}]°")
-        print(f"Lon range: [{lon_centers[0]:.1f}, {lon_centers[-1]:.1f}]°")
-        print(f"Total computed area: {np.sum(area_per_bin):.3e} m²")
-        print(f"Expected sphere area: {4 * np.pi * R_M ** 2:.3e} m²")
-        print(f"Coverage: {100 * np.sum(area_per_bin) / (4 * np.pi * R_M ** 2):.1f}%")
+        total_area = np.sum(area_per_bin)
+        sphere_area = 4 * np.pi * R_M**2
+        print(f"\n{'='*60}\nDEBUG: {case_name}\n{'='*60}")
+        print(f"Grid: {n_lat} x {n_lon}")
+        print(f"Computed area: {total_area:.3e} m^2 (sphere: {sphere_area:.3e} m^2, {100*total_area/sphere_area:.1f}%)")
 
     # Convert flux from cm^-2 s^-1 to m^-2 s^-1 for integration
     flux_map_si = flux_map_clean * 1e4
 
-    # Total integrated flux [particles/s]
-    total_flux = np.sum(flux_map_si * area_per_bin)
-    stats['total_integrated_flux'] = total_flux
+    # Total integrated flux [#/s]
+    stats['total_integrated_flux'] = float(np.sum(flux_map_si * area_per_bin))
 
-    # Peak flux and location
+    # Peak flux and location (use original flux_map so NaNs don't affect argmax)
     peak_idx = np.unravel_index(np.nanargmax(flux_map), flux_map.shape)
-    stats['peak_flux_value'] = flux_map[peak_idx]
-    stats['peak_flux_lat'] = lat_centers[peak_idx[0]]
-    stats['peak_flux_lon'] = lon_centers[peak_idx[1]]
+    stats['peak_flux_value'] = float(flux_map[peak_idx])
+    stats['peak_flux_lat'] = float(lat_centers[peak_idx[0]])
+    stats['peak_flux_lon'] = float(lon_centers[peak_idx[1]])
 
     # Spatial extent above threshold
     if flux_threshold is None:
         flux_threshold = 0.001 * stats['peak_flux_value']  # 0.1% of peak
-    stats['threshold_used'] = flux_threshold
+    stats['threshold_used'] = float(flux_threshold)
 
     above_threshold = flux_map_clean >= flux_threshold
-    area_above_threshold = np.sum(area_per_bin[above_threshold])
+    area_above_threshold = float(np.sum(area_per_bin[above_threshold]))
     total_surface_area = 4 * np.pi * R_M ** 2
 
     stats['spatial_extent_area'] = area_above_threshold
-    stats['spatial_extent_percentage'] = (area_above_threshold / total_surface_area) * 100
+    stats['spatial_extent_percentage'] = 100.0 * area_above_threshold / total_surface_area
 
-    # Create 2D coordinate grids for lat/lon
+    # 2D grids
     lat_grid, lon_grid = np.meshgrid(lat_centers, lon_centers, indexing='ij')
-
-    # ========== HEMISPHERIC ASYMMETRY ==========
-    # Northern hemisphere: lat >= 0
-    # Southern hemisphere: lat < 0
-
-    northern_mask = lat_grid >= 0
-    southern_mask = lat_grid < 0
-
-    northern_flux = np.sum(flux_map_si[northern_mask] * area_per_bin[northern_mask])
-    southern_flux = np.sum(flux_map_si[southern_mask] * area_per_bin[southern_mask])
-
-    if debug:
-        print(f"\nHemisphere split:")
-        print(f"Northern bins: {northern_mask.sum()}")
-        print(f"Southern bins: {southern_mask.sum()}")
-        print(f"Northern flux: {northern_flux:.2e} particles/s")
-        print(f"Southern flux: {southern_flux:.2e} particles/s")
-        print(f"Sum: {northern_flux + southern_flux:.2e} particles/s")
-        print(f"Total: {total_flux:.2e} particles/s")
-
-    stats['northern_hemisphere_flux'] = northern_flux
-    stats['southern_hemisphere_flux'] = southern_flux
-
-    if southern_flux > 0:
-        stats['hemispheric_asymmetry_ratio'] = northern_flux / southern_flux
-    else:
-        stats['hemispheric_asymmetry_ratio'] = np.inf if northern_flux > 0 else 0.0
-
-    # ========== DAYSIDE VS NIGHTSIDE (PROPER SPHERICAL GEOMETRY) ==========
-    # A point is on dayside if Sun is above its horizon
-    # In MSO: Sun at +X (lon=0°), so check x-component of position vector
-
-    # Convert lat/lon to Cartesian coordinates
     lat_grid_rad = np.radians(lat_grid)
     lon_grid_rad = np.radians(lon_grid)
 
-    # Position unit vector x-component: x = cos(lat) * cos(lon)
-    x_grid = np.cos(lat_grid_rad) * np.cos(lon_grid_rad)
+    # Hemisphere split
+    northern_mask = lat_grid >= 0
+    southern_mask = lat_grid < 0
 
-    # Dayside: x > 0 (Sun above horizon)
-    # Nightside: x <= 0 (Sun below horizon)
+    northern_flux = float(np.sum(flux_map_si[northern_mask] * area_per_bin[northern_mask]))
+    southern_flux = float(np.sum(flux_map_si[southern_mask] * area_per_bin[southern_mask]))
+
+    stats['northern_hemisphere_flux'] = northern_flux
+    stats['southern_hemisphere_flux'] = southern_flux
+    stats['hemispheric_asymmetry_ratio'] = (northern_flux / southern_flux) if southern_flux > 0 else (np.inf if northern_flux > 0 else 0.0)
+
+    # Day/Night split (x = cos(lat)*cos(lon))
+    x_grid = np.cos(lat_grid_rad) * np.cos(lon_grid_rad)
     dayside_mask = x_grid > 0
     nightside_mask = x_grid <= 0
 
-    dayside_flux = np.sum(flux_map_si[dayside_mask] * area_per_bin[dayside_mask])
-    nightside_flux = np.sum(flux_map_si[nightside_mask] * area_per_bin[nightside_mask])
-
-    if debug:
-        print(f"\nDay/Night split (spherical geometry):")
-        print(f"Dayside bins: {dayside_mask.sum()} (x > 0, Sun above horizon)")
-        print(f"Nightside bins: {nightside_mask.sum()} (x <= 0, Sun below horizon)")
-        print(f"Dayside flux: {dayside_flux:.2e} particles/s")
-        print(f"Nightside flux: {nightside_flux:.2e} particles/s")
-        print(f"Sum: {dayside_flux + nightside_flux:.2e} particles/s")
-
-        # Additional debug: check peak location
-        peak_lat = stats['peak_flux_lat']
-        peak_lon = stats['peak_flux_lon']
-        peak_x = np.cos(np.radians(peak_lat)) * np.cos(np.radians(peak_lon))
-        peak_side = "DAYSIDE" if peak_x > 0 else "NIGHTSIDE"
-        print(f"Peak location: lat={peak_lat:.1f}°, lon={peak_lon:.1f}°")
-        print(f"Peak x-component: {peak_x:.3f} → {peak_side}")
-        print(f"{'=' * 60}\n")
+    dayside_flux = float(np.sum(flux_map_si[dayside_mask] * area_per_bin[dayside_mask]))
+    nightside_flux = float(np.sum(flux_map_si[nightside_mask] * area_per_bin[nightside_mask]))
 
     stats['dayside_flux'] = dayside_flux
     stats['nightside_flux'] = nightside_flux
 
-    if nightside_flux > 0:
-        stats['dayside_nightside_ratio'] = dayside_flux / nightside_flux
-    else:
-        stats['dayside_nightside_ratio'] = np.inf if dayside_flux > 0 else 0.0
+    stats['dayside_nightside_ratio'] = (dayside_flux / nightside_flux) if nightside_flux > 0 else (np.inf if dayside_flux > 0 else 0.0)
 
-    # ========== MEAN AND MEDIAN FLUX ==========
+    den_dn = dayside_flux + nightside_flux
+    stats['dayside_nightside_asym_index'] = (dayside_flux - nightside_flux) / den_dn if den_dn > 0 else 0.0
+
+    # Dawn/Dusk split (y = cos(lat)*sin(lon))
+    y_grid = np.cos(lat_grid_rad) * np.sin(lon_grid_rad)
+    duskside_mask = y_grid > 0
+    dawnside_mask = y_grid < 0
+
+    duskside_flux = float(np.sum(flux_map_si[duskside_mask] * area_per_bin[duskside_mask]))
+    dawnside_flux = float(np.sum(flux_map_si[dawnside_mask] * area_per_bin[dawnside_mask]))
+
+    stats['duskside_flux'] = duskside_flux
+    stats['dawnside_flux'] = dawnside_flux
+
+    stats['dawn_dusk_ratio'] = (dawnside_flux / duskside_flux) if duskside_flux > 0 else (np.inf if dawnside_flux > 0 else 0.0)
+
+    den_dd = dawnside_flux + duskside_flux
+    stats['dawn_dusk_asym_index'] = (dawnside_flux - duskside_flux) / den_dd if den_dd > 0 else 0.0
+
+    # Mean/median (nonzero cells)
     nonzero_flux = flux_map_clean[flux_map_clean > 0]
-    if len(nonzero_flux) > 0:
-        stats['mean_flux'] = np.mean(nonzero_flux)
-        stats['median_flux'] = np.median(nonzero_flux)
+    if nonzero_flux.size > 0:
+        stats['mean_flux'] = float(np.mean(nonzero_flux))
+        stats['median_flux'] = float(np.median(nonzero_flux))
+
+    if debug:
+        peak_lat = stats['peak_flux_lat']
+        peak_lon = stats['peak_flux_lon']
+        peak_x = np.cos(np.radians(peak_lat)) * np.cos(np.radians(peak_lon))
+        peak_y = np.cos(np.radians(peak_lat)) * np.sin(np.radians(peak_lon))
+        print(f"Peak: {stats['peak_flux_value']:.3e} cm^-2 s^-1 @ (lat={peak_lat:.1f}, lon={peak_lon:.1f})")
+        print(f"Peak x={peak_x:.3f} ({'DAY' if peak_x>0 else 'NIGHT'}), y={peak_y:.3f} ({'DUSK' if peak_y>0 else ('DAWN' if peak_y<0 else 'Y=0')})")
+        print(f"Day flux: {dayside_flux:.3e} #/s, Night flux: {nightside_flux:.3e} #/s, Asym: {stats['dayside_nightside_asym_index']:.3f}")
+        print(f"Dawn flux: {dawnside_flux:.3e} #/s, Dusk flux: {duskside_flux:.3e} #/s, Asym: {stats['dawn_dusk_asym_index']:.3f}")
+        print(f"{'='*60}\n")
 
     return stats
+
 
 
 def create_comparison_table(stats_list, output_csv='flux_statistics_comparison.csv',

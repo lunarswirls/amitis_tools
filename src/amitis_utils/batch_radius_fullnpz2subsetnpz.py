@@ -6,7 +6,8 @@ import numpy as np
 
 case = "RPN"
 mode = "HNHV"
-sim_steps = list(range(105000, 350000 + 1, 1000))
+# sim_steps = list(range(105000, 350000 + 1, 1000))
+sim_steps = list(range(193000, 350000 + 1, 1000))
 # sim_steps = list(range(325000, 339000 + 1, 1000))
 dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
 select_R = 2480.e3  # shell within which you want to keep particles [m]
