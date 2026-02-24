@@ -14,7 +14,7 @@ if "Base" in case or "HNHV" in case:
 elif "inert" in case:
     dt = 0.02  # simulation dt defined in Amitis.inp [seconds]
 elif "validation" in case:
-    dt = 0.001
+    dt = 0.001  # [seconds]
 else:
     raise ValueError("Unrecognized case! Are you using Base, HNHV, or inert body files?")
 
