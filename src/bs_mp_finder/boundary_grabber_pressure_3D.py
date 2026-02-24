@@ -14,8 +14,8 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 # ----------------------------
 debug = False
 
-case = "CPS"
-mode = "LNHV"
+case = "CPN"
+mode = "HNHV"
 sim_steps = list(range(105000, 350000 + 1, 1000))
 
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/magnetopause_3D_timeseries/{case}_{mode}/"
