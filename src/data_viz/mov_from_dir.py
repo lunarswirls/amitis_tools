@@ -3,11 +3,11 @@ import os
 import cv2
 from PIL import Image
 
-case = "CPN_HNHV"
+case = "RPN_HNHV"
 
-indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/sid03_He++/"
-outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/"
-output_file = os.path.join(outdir, f"{case}_per_timestep_sid03_He++_flux.mov")
+indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/alphas_sid02_03_sum/nf/"
+outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/"
+output_file = os.path.join(outdir, f"{case}_per_timestep_He++_sum_flux.mov")
 
 fps = 5  # Frames per second (adjust for desired playback speed)
 
