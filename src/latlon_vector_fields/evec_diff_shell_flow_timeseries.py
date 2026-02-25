@@ -200,7 +200,7 @@ for step in sim_steps:
                          density=2.2, linewidth=1,
                          norm=plt.Normalize(vmin=-vmax_global, vmax=vmax_global))
 
-    cbar = plt.colorbar(strm.lines, ax=ax, label='Δ|J| [nA/m²]', extend='both')
+    cbar = plt.colorbar(strm.lines, ax=ax, label='Δ|E| [nV/m]', extend='both')
 
     ax.set_xlim(-180, 180)
     ax.set_ylim(-90, 90)
@@ -208,13 +208,13 @@ for step in sim_steps:
     ax.set_ylabel('Latitude [°]')
     ax.set_title(
         f'Signed Difference: {case1} - {case2}\n'
-        f'Current streamlines, shell {rmin / RM:.2f}-{rmax / RM:.2f} RM at t = {step * 0.002} s'
+        f'Electric field streamlines, shell {rmin / RM:.2f}-{rmax / RM:.2f} RM at t = {step * 0.002} s'
     )
     ax.grid(True, alpha=0.3)
 
     outfile = os.path.join(
         output_folder,
-        f"diff_{case1}_minus_{case2}_streamlines_{step}_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png"
+        f"diff_{case1}_minus_{case2}_efield_{step}_shell_{rmin / RM:.2f}-{rmax / RM:.2f}_RM.png"
     )
     plt.savefig(outfile, dpi=150, bbox_inches='tight')
     plt.close()

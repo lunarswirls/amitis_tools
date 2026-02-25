@@ -32,9 +32,7 @@ Notes on missing data
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-
 import bs_mp_finder.mp_pressure_utils as boundary_utils
-
 
 # ----------------------------
 # SETTINGS

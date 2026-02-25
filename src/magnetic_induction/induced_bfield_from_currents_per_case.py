@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Imports:
 import os
 from datetime import datetime
 import numpy as np
@@ -11,7 +14,7 @@ from src.field_topology.topology_utils import trace_field_line_rk, classify
 # SETTINGS
 # --------------------------
 debug = False
-case = "RPS_HNHV"
+case = "RPN_HNHV"
 step = 350000  # 115000 for base or 350000 for hnhv
 
 if step < 116000:

@@ -10,10 +10,12 @@ import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
 
 # SETTINGS
-case = "CPS_HNHV"
+case = "CPN_HNHV"
 
 filter_jmag = True
 jmag_min = 2  # nA/m^2
+
+jmag_vmax = 10
 
 sim_end = True
 
@@ -21,8 +23,8 @@ sim_end = True
 RM = 2440.0  # km
 
 # Shell limits
-rmin = 1.0 * RM
-rmax = 1.2 * RM
+rmin = 2080.0+75.0 # 1.0 * RM
+rmax = 2080.0+(75.0*2)  # 1.2 * RM
 
 if "Base" in case:
     input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
@@ -39,6 +41,7 @@ elif "HNHV" in case and sim_end:
 else:
     raise ValueError("Case not recognized")
 
+output_folder = f"{output_folder}/{rmin / RM:.2f}-{rmax / RM:.2f}_RM/"
 os.makedirs(output_folder, exist_ok=True)
 
 for step in sim_steps:
@@ -148,9 +151,10 @@ for step in sim_steps:
     # Streamplot works on regular grid
     fig, ax = plt.subplots(figsize=(12,6))
     magnitude = np.sqrt(J_theta_grid**2 + J_phi_grid**2)
-    strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2, linewidth=1, norm=plt.Normalize(vmin=0, vmax=500))
+    strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2,
+                         linewidth=1, norm=plt.Normalize(vmin=0, vmax=jmag_vmax))
 
-    plt.colorbar(strm.lines, ax=ax, label='|J|')
+    plt.colorbar(strm.lines, ax=ax, label='|J| [nA/m²]')
 
     ax.set_xlim(-180,180)
     ax.set_ylim(-90,90)

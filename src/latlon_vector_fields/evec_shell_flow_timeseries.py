@@ -10,7 +10,7 @@ import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
 
 # SETTINGS
-case = "CPS_HNHV"
+case = "RPN_HNHV"
 
 filter_jmag = False
 
@@ -38,6 +38,7 @@ elif "HNHV" in case and sim_end:
 else:
     raise ValueError("Case not recognized")
 
+output_folder = f"{output_folder}/{rmin / RM:.2f}-{rmax / RM:.2f}_RM/"
 os.makedirs(output_folder, exist_ok=True)
 
 for step in sim_steps:
@@ -147,9 +148,10 @@ for step in sim_steps:
     # Streamplot works on regular grid
     fig, ax = plt.subplots(figsize=(12,6))
     magnitude = np.sqrt(J_theta_grid**2 + J_phi_grid**2)
-    strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2, linewidth=1, norm=plt.Normalize(vmin=0, vmax=10))
+    strm = ax.streamplot(lon_grid, lat_grid, J_phi_grid, J_theta_grid, color=magnitude, cmap='plasma', density=2.2,
+                         linewidth=1, norm=plt.Normalize(vmin=0, vmax=15))
 
-    plt.colorbar(strm.lines, ax=ax, label='|E|')
+    plt.colorbar(strm.lines, ax=ax, label='|E| [nV/m]')
 
     ax.set_xlim(-180,180)
     ax.set_ylim(-90,90)

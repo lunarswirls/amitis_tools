@@ -17,7 +17,7 @@ from matplotlib.patches import Circle, Wedge
 # ----------------------------
 # SETTINGS
 # ----------------------------
-case = "RPN"
+case = "CPN"
 mode = "HNHV"
 out_folder   = f"/Users/danywaller/Projects/mercury/extreme/timeseries_3x3_efield_interior/{case}_{mode}/"
 os.makedirs(out_folder, exist_ok=True)
@@ -306,7 +306,7 @@ for sim_step in sim_steps:
     # One colorbar above each column
     for c in range(3):
         cb = fig.colorbar(pms[c], ax=axes[:, c], location="top", pad=0.02, fraction=0.04, shrink=0.9)
-        cb.ax.set_title(r"???$", fontsize=9)
+        cb.ax.set_title(r"$nV/m$", fontsize=9)
 
     tsec = sim_step * 0.002
     fig.suptitle(f"{case} {mode} Electric field slices at t = {tsec:.1f} s", fontsize=12)
