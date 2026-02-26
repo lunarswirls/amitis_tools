@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 # ----------------------------
 debug = False
 
-case = "CPN"
+case = "RPN"
 mode = "HNHV"
 sim_steps = list(range(105000, 350000 + 1, 1000))
 
