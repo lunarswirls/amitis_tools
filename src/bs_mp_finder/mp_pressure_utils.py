@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Imports:
 import numpy as np
 import xarray as xr
 
@@ -8,6 +9,7 @@ MP  = 1.67262192369e-27     # kg (proton mass)
 NT_TO_T = 1e-9
 CM3_TO_M3 = 1e6
 KMS_TO_MS = 1e3
+
 
 def compute_mp_mask_pressure_balance(
     f_3d: str,
@@ -19,7 +21,7 @@ def compute_mp_mask_pressure_balance(
     abs_tol_pa: float = 0.0,
 ):
     """
-    Magnetopause boundary from pressure balance:
+    Magnetopause boundary from pressure balance (Cravens eq. 7.2):
         P_B = B^2/(2 mu0)  and  P_dyn = rho * V^2
 
     Returns:
@@ -44,7 +46,7 @@ def compute_mp_mask_pressure_balance(
     BY = t3(ds["By_tot"].isel(time=0).values)
     BZ = t3(ds["Bz_tot"].isel(time=0).values)
 
-    # species velocities (km/s)
+    # velocities (km/s)
     vxp = t3(ds["vx01"].isel(time=0).values + ds["vx02"].isel(time=0).values)
     vyp = t3(ds["vy01"].isel(time=0).values + ds["vy02"].isel(time=0).values)
     vzp = t3(ds["vz01"].isel(time=0).values + ds["vz02"].isel(time=0).values)
@@ -76,7 +78,7 @@ def compute_mp_mask_pressure_balance(
     # Mass density: rho = m_p (n_p + 4 n_alpha)
     rho = MP * (np_m3 + 4.0 * na_m3)  # kg/m^3
 
-    # Mass-weighted bulk velocity (optional but sensible)
+    # Mass-weighted bulk velocity
     # u = (m_p n_p v_p + 4 m_p n_a v_a) / (m_p n_p + 4 m_p n_a)
     #   = (n_p v_p + 4 n_a v_a) / (n_p + 4 n_a)
     denom = (np_m3 + 4.0 * na_m3)

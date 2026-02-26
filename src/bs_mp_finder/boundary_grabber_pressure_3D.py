@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Imports:
 import os
 import numpy as np
 import plotly.graph_objects as go
 from skimage import measure
-import bs_mp_finder.mp_pressure_utils as boundary_utils
+import src.bs_mp_finder.mp_pressure_utils as boundary_utils
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -21,30 +22,30 @@ sim_steps = list(range(105000, 350000 + 1, 1000))
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/magnetopause_3D_timeseries/{case}_{mode}/"
 os.makedirs(out_dir, exist_ok=True)
 
-RMIN_RM = 1.0
-RMAX_RM = 4.0
-REL_TOL = 0.15
-ABS_TOL_PA = 0.0
+rmin_rm = 1.0
+rmax_rm = 4.0
+rel_tol = 0.15
+abs_tol_mp_pressure = 0.0  # units: Pa!!!
 
-ISO_LEVEL = 0.0
-DECIMATE = 2
-MAX_FACES = 250_000
+iso_lev = 0.0
+decimation = 2
+max_faces = 250_000
 
-SURF_OPACITY = 0.25
-SURF_COLOR = "magenta"
+surf_opacity = 0.25
+surf_color = "magenta"
 
-AX_RANGE = [-2, 2]
+ax_range = [-2, 2]
 camera = dict(eye=dict(x=1.6, y=1.3, z=0.9), center=dict(x=0, y=0, z=0))
 
-Z_GEO_RM = 0.0
-Z_MAG_RM = 484.0 / 2440.0
+z_geo_rm = 0.0
+z_mag_rm = 484.0 / 2440.0
 
-X_MIN = 0.5
-Y_MIN = -0.5
-Y_MAX = 0.5
-Z_TOL = 0.05
+x_min = 0.5
+y_min = -0.5
+y_max = 0.5
+z_tol = 0.05
 
-EQ_MARKER_SIZE = 7
+eq_marker_sz = 7
 
 # ----------------------------
 # Helpers
@@ -102,13 +103,13 @@ def mercury_sphere_traces(plot_depth=1.0):
 
 def mesh_from_pressures(PB_pa, Pdyn_pa, x, y, z, outside_body):
     """
-    Return (verts_xyz, faces) for F=log10(PB/Pdyn)=ISO_LEVEL using marching cubes.
+    Return (verts_xyz, faces) for F=log10(PB/Pdyn)=iso_lev using marching cubes.
     """
     eps_pa = 1e-30
     F = np.log10((PB_pa + eps_pa) / (Pdyn_pa + eps_pa))
     F = np.where(outside_body, F, np.nan)
 
-    sl = slice(None, None, DECIMATE)
+    sl = slice(None, None, decimation)
     Fd = F[sl, sl, sl]
     xd = x[sl]; yd = y[sl]; zd = z[sl]
     if len(xd) < 2 or len(yd) < 2 or len(zd) < 2:
@@ -121,7 +122,7 @@ def mesh_from_pressures(PB_pa, Pdyn_pa, x, y, z, outside_body):
     dz = float(zd[1] - zd[0])
 
     try:
-        verts, faces, _, _ = measure.marching_cubes(V, level=ISO_LEVEL, spacing=(dx, dy, dz))
+        verts, faces, _, _ = measure.marching_cubes(V, level=iso_lev, spacing=(dx, dy, dz))
     except (ValueError, RuntimeError):
         return None, None
 
@@ -129,8 +130,8 @@ def mesh_from_pressures(PB_pa, Pdyn_pa, x, y, z, outside_body):
     verts[:, 1] += float(yd[0])
     verts[:, 2] += float(zd[0])
 
-    if faces.shape[0] > MAX_FACES:
-        sel = np.random.choice(faces.shape[0], MAX_FACES, replace=False)
+    if faces.shape[0] > max_faces:
+        sel = np.random.choice(faces.shape[0], max_faces, replace=False)
         faces = faces[sel]
 
     return verts, faces
@@ -142,8 +143,8 @@ def plotly_mesh_trace_from_verts_faces(verts, faces, visible=False, name="Magnet
     return go.Mesh3d(
         x=verts[:, 0], y=verts[:, 1], z=verts[:, 2],
         i=faces[:, 0], j=faces[:, 1], k=faces[:, 2],
-        color=SURF_COLOR,
-        opacity=SURF_OPACITY,
+        color=surf_color,
+        opacity=surf_opacity,
         flatshading=True,
         name=name,
         visible=visible,
@@ -185,14 +186,14 @@ sphere_day, sphere_night = mercury_sphere_traces(plot_depth=1.0)
 step_labels = []
 valid_filepaths = []
 
-# store meshes for both Plotly+Matplotlib without recomputing marching cubes
+# store meshes for without recomputing marching cubes
 mesh_verts = []
 mesh_faces = []
 
 geo_pts = []
 mag_pts = []
 
-# cached grid products (only if grid is constant)
+# cached grid products
 grid_cached = False
 x_cache = y_cache = z_cache = None
 Rg_cache = None
@@ -212,10 +213,10 @@ for sim_step in sim_steps:
     x, y, z, PB_pa, Pdyn_pa, mp_mask_da = boundary_utils.compute_mp_mask_pressure_balance(
         f_3d,
         debug=debug,
-        r_min_rm=RMIN_RM,
-        r_max_rm=RMAX_RM,
-        rel_tol=REL_TOL,
-        abs_tol_pa=ABS_TOL_PA,
+        r_min_rm=rmin_rm,
+        r_max_rm=rmax_rm,
+        rel_tol=rel_tol,
+        abs_tol_pa=abs_tol_mp_pressure,
     )
     mp_mask = (mp_mask_da.values > 0)
 
@@ -224,8 +225,8 @@ for sim_step in sim_steps:
         Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
         Rg_cache = np.sqrt(Xg**2 + Yg**2 + Zg**2)
 
-        outside_body_cache = (Rg_cache >= RMIN_RM) & (Rg_cache < RMAX_RM)
-        region_cache = (Xg > X_MIN) & (Yg >= Y_MIN) & (Yg <= Y_MAX) & outside_body_cache
+        outside_body_cache = (Rg_cache >= rmin_rm) & (Rg_cache < rmax_rm)
+        region_cache = (Xg > x_min) & (Yg >= y_min) & (Yg <= y_max) & outside_body_cache
 
         x_cache, y_cache, z_cache = x, y, z
         grid_cached = True
@@ -235,19 +236,19 @@ for sim_step in sim_steps:
            or (not np.allclose(x, x_cache)) or (not np.allclose(y, y_cache)) or (not np.allclose(z, z_cache)):
             Xg, Yg, Zg = np.meshgrid(x, y, z, indexing="ij")
             Rg_cache = np.sqrt(Xg**2 + Yg**2 + Zg**2)
-            outside_body_cache = (Rg_cache >= RMIN_RM) & (Rg_cache < RMAX_RM)
-            region_cache = (Xg > X_MIN) & (Yg >= Y_MIN) & (Yg <= Y_MAX) & outside_body_cache
+            outside_body_cache = (Rg_cache >= rmin_rm) & (Rg_cache < rmax_rm)
+            region_cache = (Xg > x_min) & (Yg >= y_min) & (Yg <= y_max) & outside_body_cache
             x_cache, y_cache, z_cache = x, y, z
 
-    # max points (use cached Rg + cached region; avoid creating Xg/Yg/Zg again)
-    geo_p = max_point_on_equator(mp_mask, x_cache, y_cache, z_cache, Rg_cache, region_cache, Z_GEO_RM, Z_TOL)
-    mag_p = max_point_on_equator(mp_mask, x_cache, y_cache, z_cache, Rg_cache, region_cache, Z_MAG_RM, Z_TOL)
+    # max points (use cached Rg + cached region)
+    geo_p = max_point_on_equator(mp_mask, x_cache, y_cache, z_cache, Rg_cache, region_cache, z_geo_rm, z_tol)
+    mag_p = max_point_on_equator(mp_mask, x_cache, y_cache, z_cache, Rg_cache, region_cache, z_mag_rm, z_tol)
     geo_p.update(t=float(tsec), label=lab)
     mag_p.update(t=float(tsec), label=lab)
     geo_pts.append(geo_p)
     mag_pts.append(mag_p)
 
-    # mesh (store verts/faces only; re-use later for Plotly and Matplotlib)
+    # mesh (store verts/faces only)
     verts, faces = mesh_from_pressures(PB_pa, Pdyn_pa, x_cache, y_cache, z_cache, outside_body_cache)
     mesh_verts.append(verts)
     mesh_faces.append(faces)
@@ -282,7 +283,7 @@ for i, lab in enumerate(step_labels):
             y=[] if not np.isfinite(gp["y"]) else [gp["y"]],
             z=[] if not np.isfinite(gp["z"]) else [gp["z"]],
             mode="markers",
-            marker=dict(size=EQ_MARKER_SIZE, color="yellow"),
+            marker=dict(size=eq_marker_sz, color="yellow"),
             name=geo_name,
             visible=False,
             customdata=[] if not np.isfinite(alt_geo) else [alt_geo],
@@ -297,7 +298,7 @@ for i, lab in enumerate(step_labels):
             y=[] if not np.isfinite(mp["y"]) else [mp["y"]],
             z=[] if not np.isfinite(mp["z"]) else [mp["z"]],
             mode="markers",
-            marker=dict(size=EQ_MARKER_SIZE, color="blue"),
+            marker=dict(size=eq_marker_sz, color="blue"),
             name=mag_name,
             visible=False,
             customdata=[] if not np.isfinite(alt_mag) else [alt_mag],
@@ -352,9 +353,9 @@ fig.update_layout(
     legend=dict(x=1.02, y=0.95, bgcolor="rgba(255,255,255,0.9)"),
     sliders=sliders,
     scene=dict(
-        xaxis=dict(title="X (R<sub>M</sub>)", range=AX_RANGE),
-        yaxis=dict(title="Y (R<sub>M</sub>)", range=AX_RANGE),
-        zaxis=dict(title="Z (R<sub>M</sub>)", range=AX_RANGE),
+        xaxis=dict(title="X (R<sub>M</sub>)", range=ax_range),
+        yaxis=dict(title="Y (R<sub>M</sub>)", range=ax_range),
+        zaxis=dict(title="Z (R<sub>M</sub>)", range=ax_range),
         aspectmode="cube",
         camera=camera,
     ),
@@ -410,7 +411,7 @@ def update(frame_idx):
     faces = mesh_faces[frame_idx]
     if verts is not None:
         tri = verts[faces]
-        mesh_artist = Poly3DCollection(tri, facecolor=SURF_COLOR, edgecolor="none", alpha=SURF_OPACITY)
+        mesh_artist = Poly3DCollection(tri, facecolor=surf_color, edgecolor="none", alpha=surf_opacity)
         ax.add_collection3d(mesh_artist)
 
     gp = geo_pts[frame_idx]
