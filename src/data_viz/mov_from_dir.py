@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# Imports:
 import os
 import cv2
 from PIL import Image
 
 case = "RPN_HNHV"
 
-indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/alphas_sid02_03_sum/nf/"
+indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/sid02_He++/"
 outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/"
-output_file = os.path.join(outdir, f"{case}_per_timestep_He++_sum_flux.mov")
+output_file = os.path.join(outdir, f"{case}_per_timestep_sid02_He++_flux.mov")
 
 fps = 5  # Frames per second (adjust for desired playback speed)
 
