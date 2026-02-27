@@ -111,32 +111,54 @@ def load_field(ncfile, var_ext):
     z = ds["Nz"].values  # [km]
 
     # Extract fields (drop time dimension) and transpose: Nz, Ny, Nx --> Nx, Ny, Nz
-    Jx = np.transpose(ds[var_ext[0]].isel(time=0).values, (2, 1, 0))  # [nA/m^2]
-    Jy = np.transpose(ds[var_ext[1]].isel(time=0).values, (2, 1, 0))  # [nA/m^2]
-    Jz = np.transpose(ds[var_ext[2]].isel(time=0).values, (2, 1, 0))  # [nA/m^2]
+    Jx = np.transpose(ds[var_ext[0]].isel(time=0).values, (2, 1, 0))  # [nA/m^2] or [nT]
+    Jy = np.transpose(ds[var_ext[1]].isel(time=0).values, (2, 1, 0))  # [nA/m^2] or [nT]
+    Jz = np.transpose(ds[var_ext[2]].isel(time=0).values, (2, 1, 0))  # [nA/m^2] or [nT]
     ds.close()
     return x, y, z, Jx, Jy, Jz
 
+# ---- Resistive case ----
 x_km, y_km, z_km, Jx_nA_r, Jy_nA_r, Jz_nA_r = load_field(ncfile_r, ["Jx", "Jy", "Jz"])
-_, _, _, Bx_r, By_r, Bz_r = load_field(ncfile_r, ["Bx_tot", "By_tot", "Bz_tot"])
+_, _, _, BxTot_r, ByTot_r, BzTot_r = load_field(ncfile_r, ["Bx_tot", "By_tot", "Bz_tot"])
+_, _, _, BxExt_r, ByExt_r, BzExt_r = load_field(ncfile_r, ["Bx", "By", "Bz"])
 
 start = datetime.now()
 print(f"Loaded resistive core at {str(start)}")
 
+# ---- Conductive case ----
 _, _, _, Jx_nA_c, Jy_nA_c, Jz_nA_c = load_field(ncfile_c, ["Jx", "Jy", "Jz"])
-_, _, _, Bx_c, By_c, Bz_c = load_field(ncfile_c, ["Bx_tot", "By_tot", "Bz_tot"])
+_, _, _, BxTot_c, ByTot_c, BzTot_c = load_field(ncfile_c, ["Bx_tot", "By_tot", "Bz_tot"])
+_, _, _, BxExt_c, ByExt_c, BzExt_c = load_field(ncfile_c, ["Bx", "By", "Bz"])
 
 start = datetime.now()
 print(f"Loaded conductive core at {str(start)}")
 
+# --------------------------
+# CORE FIELD (common dipole)
+# --------------------------
+# You said you can get the core field as:
+#   B_core = B_tot - B_ext
+# where B_ext is the non-core part in your outputs.
+# If the core dipole is identical between runs, B_core_r and B_core_c should match closely.
+Bx_core = BxTot_r - BxExt_r
+By_core = ByTot_r - ByExt_r
+Bz_core = BzTot_r - BzExt_r
+
+# --------------------------
+# DIFFERENCES (conductive - resistive)
+# --------------------------
 Jx_nA = Jx_nA_c - Jx_nA_r
 Jy_nA = Jy_nA_c - Jy_nA_r
 Jz_nA = Jz_nA_c - Jz_nA_r
 
-Bx_nT = Bx_c - Bx_r
-By_nT = By_c - By_r
-Bz_nT = Bz_c - Bz_r
+# This contains the signed change in *total* field between runs.
+# If the two runs share the same core dipole and the same driver field setup,
+# then this is effectively the induced-field contribution that appears due to conductivity.
+Bx_nT = BxTot_c - BxTot_r
+By_nT = ByTot_c - ByTot_r
+Bz_nT = BzTot_c - BzTot_r
 # TODO: need signed diffs to see what is being removed
+
 
 def idx_range(coord_km, lo, hi):
     i0 = int(np.searchsorted(coord_km, lo, side="left"))
@@ -160,6 +182,11 @@ Jz_sub = Jz_nA[sx, sy, sz]
 Bxdiff_sub = Bx_nT[sx, sy, sz]
 Bydiff_sub = By_nT[sx, sy, sz]
 Bzdiff_sub = Bz_nT[sx, sy, sz]
+
+# core field on same subgrid
+Bxcore_sub = Bx_core[sx, sy, sz]
+Bycore_sub = By_core[sx, sy, sz]
+Bzcore_sub = Bz_core[sx, sy, sz]
 
 if debug:
     # ---- sanity prints ----
@@ -185,7 +212,7 @@ def B_from_J_fft_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA, use_complex64=Tru
     """
     Compute magnetic field B(x,y,z) from a 3-D current density J(x,y,z) using an FFT-based
     spectral solver.
-    https://www.sciencedirect.com/science/article/pii/S0021999120301820
+    [https://www.sciencedirect.com/science/article/pii/S0021999120301820](https://www.sciencedirect.com/science/article/pii/S0021999120301820)
 
     Method (Fourier space):
         B(k) = i * μ0 * (k × J(k)) / |k|^2
@@ -371,7 +398,7 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
 
     def solve_component(Ji):
         b = (MU0 * Ji).ravel(order="C")
-        Ai, info = spla.cg(Aop, b, rtol=rtol, atol=atol, maxiter=maxiter, M=M)  # [web:16]
+        Ai, info = spla.cg(Aop, b, rtol=rtol, atol=atol, maxiter=maxiter, M=M)
         if info != 0:
             raise RuntimeError(f"CG did not converge (info={info})")
         return Ai.reshape((Nx, Ny, Nz), order="C")
@@ -431,6 +458,26 @@ Jz_box = Jz_sub[sx2, sy2, sz2]
 Bxdiff_box = Bxdiff_sub[sx2, sy2, sz2]
 Bydiff_box = Bydiff_sub[sx2, sy2, sz2]
 Bzdiff_box = Bzdiff_sub[sx2, sy2, sz2]
+
+# core field in the same box (nT)
+Bxcore_box = Bxcore_sub[sx2, sy2, sz2]
+Bycore_box = Bycore_sub[sx2, sy2, sz2]
+Bzcore_box = Bzcore_sub[sx2, sy2, sz2]
+
+# --------------------------
+# SIGNED INDUCED CONTRIBUTION ALONG CORE
+# --------------------------
+# This is the key quantity you want: the induced field difference (conductive-resistive)
+# projected onto the core-field direction. Positive => reinforces core, negative => opposes.
+eps = 1e-30
+Bcore_mag = np.sqrt(Bxcore_box*Bxcore_box + Bycore_box*Bycore_box + Bzcore_box*Bzcore_box) + eps
+bxhat = Bxcore_box / Bcore_mag
+byhat = Bycore_box / Bcore_mag
+bzhat = Bzcore_box / Bcore_mag
+
+Bind_parallel = Bxdiff_box*bxhat + Bydiff_box*byhat + Bzdiff_box*bzhat  # [nT]
+
+print("Bind_parallel min/max (nT) =", np.nanmin(Bind_parallel), np.nanmax(Bind_parallel))
 
 # |B| without keeping an extra huge temporary around longer than needed
 Bmag = np.sqrt(Bx_box*Bx_box + By_box*By_box + Bz_box*Bz_box)
@@ -594,6 +641,7 @@ ix0 = int(np.argmin(np.abs(x_box)))
 iy0 = int(np.argmin(np.abs(y_box)))
 iz0 = int(np.argmin(np.abs(z_box)))
 
+
 def mask_inside_circle(U, V, X, Y, R):
     """
     Mask vector field inside r<R by setting to NaN (streamplot will avoid).
@@ -606,13 +654,16 @@ def mask_inside_circle(U, V, X, Y, R):
     return Um, Vm
 
 
+
 def add_panel(ax, x1d, y1d, U_xy, V_xy, R, title, density=1.6, lw=1.0, cmap="viridis",
-              Rc=2080, Rc_style=dict(color="hotpink", lw=1.5, ls="-"), min_mag=0.01, log_color=False):
+              Rc=2080, Rc_style=dict(color="hotpink", lw=1.5, ls="-"), min_mag=0.01, log_color=False,
+              vmin=None, vmax=None):
     """
 
     Rc: optional second circle radius (km)
     Rc_style: line style dict for Rc circle
     log_color: if True, use log10 of magnitude for streamplot color
+    vmin/vmax: optional fixed color limits
     """
     X, Y = np.meshgrid(x1d, y1d, indexing="xy")
 
@@ -652,6 +703,9 @@ def add_panel(ax, x1d, y1d, U_xy, V_xy, R, title, density=1.6, lw=1.0, cmap="vir
         linewidth=lw,
         arrowsize=1.0
     )
+
+    if (vmin is not None) and (vmax is not None):
+        sp.lines.set_clim(vmin, vmax)
 
     ax.set_title(title)
     ax.set_aspect("equal", adjustable="box")
@@ -722,7 +776,6 @@ axes[1, 2].set_ylabel("Z [Rₘ]")
 
 # colorbars (one for B_diff row, one for B_ind row) based on magnitude
 cbar0 = fig.colorbar(sp00.lines, ax=axes[0, :].ravel().tolist(), fraction=0.02, pad=0.02)
-cbar0.set_label("|ΔB| [nT]")
 if plotlog:
     cbar0.set_label("log10(|ΔB|) [nT]")
     cbar0.mappable.set_clim(-1.0, 2.0)
@@ -745,6 +798,69 @@ out_png = os.path.join(output_folder, f"{case_c}-{case_r}_{branch}_{step}_Bdiff_
 plt.savefig(out_png, dpi=250, bbox_inches='tight')
 # plt.close(fig)
 print("Saved:", out_png)
+
+# --------------------------
+# NEW FIGURE: signed induced contribution along core direction
+# --------------------------
+# We plot Bind_parallel on the same three slices. This is a scalar field, so use imshow/pcolormesh.
+# Positive => induced field reinforces the core dipole; negative => it opposes it.
+
+# slices of Bind_parallel (nT)
+Bp_xy = Bind_parallel[:, :, iz0].T
+Bp_xz = Bind_parallel[:, iy0, :].T
+Bp_yz = Bind_parallel[ix0, :, :].T
+
+fig2, axes2 = plt.subplots(1, 3, figsize=(16, 5), constrained_layout=True)
+
+# robust symmetric limits
+v = np.nanpercentile(np.abs(Bind_parallel), 99.0)
+if not np.isfinite(v) or v == 0.0:
+    v = np.nanmax(np.abs(Bind_parallel))
+    if not np.isfinite(v) or v == 0.0:
+        v = 1.0
+
+# XY
+im0 = axes2[0].imshow(Bp_xy, origin='lower',
+                      extent=[x_box[0]/RM, x_box[-1]/RM, y_box[0]/RM, y_box[-1]/RM],
+                      cmap='RdBu_r', vmin=-v, vmax=v, interpolation='nearest', aspect='equal')
+axes2[0].set_title(r"$\Delta\mathbf{B}\cdot\hat{\mathbf{B}}_{core}$ : XY (z=0)")
+axes2[0].set_xlabel('X [Rₘ]')
+axes2[0].set_ylabel('Y [Rₘ]')
+
+# XZ
+im1 = axes2[1].imshow(Bp_xz, origin='lower',
+                      extent=[x_box[0]/RM, x_box[-1]/RM, z_box[0]/RM, z_box[-1]/RM],
+                      cmap='RdBu_r', vmin=-v, vmax=v, interpolation='nearest', aspect='equal')
+axes2[1].set_title(r"$\Delta\mathbf{B}\cdot\hat{\mathbf{B}}_{core}$ : XZ (y=0)")
+axes2[1].set_xlabel('X [Rₘ]')
+axes2[1].set_ylabel('Z [Rₘ]')
+
+# YZ
+im2 = axes2[2].imshow(Bp_yz, origin='lower',
+                      extent=[y_box[0]/RM, y_box[-1]/RM, z_box[0]/RM, z_box[-1]/RM],
+                      cmap='RdBu_r', vmin=-v, vmax=v, interpolation='nearest', aspect='equal')
+axes2[2].set_title(r"$\Delta\mathbf{B}\cdot\hat{\mathbf{B}}_{core}$ : YZ (x=0)")
+axes2[2].set_xlabel('Y [Rₘ]')
+axes2[2].set_ylabel('Z [Rₘ]')
+
+# overlay planet + CMB circles
+th = np.linspace(0, 2*np.pi, 400)
+Rsurf = 1.0
+Rc = 2080.0 / RM
+for ax in axes2:
+    ax.plot(Rsurf*np.cos(th), Rsurf*np.sin(th), color='k', lw=1.5)
+    ax.plot(Rc*np.cos(th), Rc*np.sin(th), color='hotpink', lw=1.2)
+
+cbar = fig2.colorbar(im0, ax=axes2.ravel().tolist(), fraction=0.03, pad=0.02)
+cbar.set_label(r"$\Delta\mathbf{B}\cdot\hat{\mathbf{B}}_{core}$ [nT]  ( + reinforces / − opposes )")
+
+fig2.suptitle(f"{case_c}-{case_r} {branch} signed induced contribution along core; t={step*0.002} s", fontsize=16)
+
+out_png2 = os.path.join(output_folder, f"{case_c}-{case_r}_{branch}_{step}_Bind_parallel_slices.png")
+plt.savefig(out_png2, dpi=250, bbox_inches='tight')
+plt.close(fig2)
+print("Saved:", out_png2)
+
 
 # ======================
 # PLOT FIELD LINES (X-Z PLANE)
