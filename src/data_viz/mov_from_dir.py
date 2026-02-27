@@ -5,11 +5,15 @@ import os
 import cv2
 from PIL import Image
 
-case = "RPN_HNHV"
+case = "CPS_Base"
 
-indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/sid02_He++/"
-outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/"
-output_file = os.path.join(outdir, f"{case}_per_timestep_sid02_He++_flux.mov")
+# indir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/sid02_He++/"
+# outdir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/"
+# output_file = os.path.join(outdir, f"{case}_per_timestep_sid02_He++_flux.mov")
+
+indir = f"/Users/danywaller/Projects/mercury/extreme/timeseries_tot_den_xy_xz_yz/{case}/"
+outdir = f"/Users/danywaller/Projects/mercury/extreme/timeseries_tot_den_xy_xz_yz/"
+output_file = os.path.join(outdir, f"{case}_tot_den_xy_xz_yz.mov")
 
 fps = 5  # Frames per second (adjust for desired playback speed)
 

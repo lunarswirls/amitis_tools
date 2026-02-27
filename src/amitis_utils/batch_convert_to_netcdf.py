@@ -4,12 +4,12 @@
 from pyamitis.amitis_netcdf import *
 from pyamitis.amitis_hdf import *
 
-indir = '/Users/danywaller/Projects/mercury/test10_2025dec10/'
-sim_steps = [20000, 40000, 60000, 80000, 100000]
+indir = '/Volumes/data_backup/mercury/extreme_dany/CPN_BNBV_extendedX/out/'
+sim_steps = [30000, 50000]
 compress = True
 
 for sim_step in sim_steps:
-    filename = 'Amitis_field_' + "%06d" % (sim_step)
+    filename = 'Amitis_CPN_BNBV_' + "%06d" % (sim_step)
 
     obj_hdf = amitis_hdf(indir, filename + '.h5')
 

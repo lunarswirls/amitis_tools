@@ -4,13 +4,13 @@ import numpy as np
 # from Amitis.inp file
 # =========================
 B_T = 25e-9                                                    # IMF magnitude [T]
-species = np.array(["H+", "He++"])
-sim_ppc = np.array([6, 3], dtype=float)                 # macroparticles per cell
-sim_den = np.array([19.0e6, 0.5e6], dtype=float)        # number density [m^-3]
-sim_vel = np.array([990.0e3, 990.0e3], dtype=float)     # bulk speed magnitude [m/s]
-species_mass = np.array([1.0, 4.0], dtype=float)        # mass in amu
-species_charge = np.array([1.0, 2.0], dtype=float)      # charge state Z (|q| = Z e)
-T_sw_K = np.array([1.4e5, 5.6e5], dtype=float)          # species temperature [K]
+species = np.array(["H+"])
+sim_ppc = np.array([9], dtype=float)                 # macroparticles per cell
+sim_den = np.array([19.0e6], dtype=float)        # number density [m^-3]
+sim_vel = np.array([990.0e3], dtype=float)     # bulk speed magnitude [m/s]
+species_mass = np.array([1.0], dtype=float)        # mass in amu
+species_charge = np.array([1.0], dtype=float)      # charge state Z (|q| = Z e)
+T_sw_K = np.array([1.4e5], dtype=float)          # species temperature [K]
 
 # Alternatively, set T_sw_K to None and use T_sw_eV instead
 T_sw_eV = None
