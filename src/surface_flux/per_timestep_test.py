@@ -76,6 +76,25 @@ energy_eps = 1e-60
 # -----------------------
 # Helpers
 # -----------------------
+def polyfit3_curve(x, y, n_eval=400):
+    """
+    Fit y(x) with a 3rd-order polynomial and return a smooth curve for plotting.
+    """
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    m = np.isfinite(x) & np.isfinite(y)
+    x = x[m]
+    y = y[m]
+
+    # coeffs: [a3, a2, a1, a0] for a3*x^3 + a2*x^2 + a1*x + a0
+    coeffs = np.polyfit(x, y, deg=3)  # cubic fit [web:2]
+
+    xfit = np.linspace(x.min(), x.max(), n_eval)
+    yfit = np.polyval(coeffs, xfit)   # evaluate polynomial
+    return coeffs, xfit, yfit
+
+
 def _deg_edges_to_rad(lon_edges_deg, lat_edges_deg):
     lon_e = np.deg2rad(lon_edges_deg)
     lat_e = np.deg2rad(lat_edges_deg)
