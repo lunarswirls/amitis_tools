@@ -3,6 +3,8 @@
 # Imports:
 import numpy as np
 import xarray as xr
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # needed for 3D plotting
 
 MU0 = 4e-7 * np.pi          # N/A^2 (H/m)
 MP  = 1.67262192369e-27     # kg (proton mass)
@@ -16,7 +18,7 @@ def compute_mp_mask_pressure_balance(
     debug: bool = False,
     RM_M: float = 2440.0e3,
     r_min_rm: float = 1.0,
-    r_max_rm: float = 4.0,
+    r_max_rm: float = 3.0,
     rel_tol: float = 0.15,
     abs_tol_pa: float = 0.0,
 ):
@@ -29,14 +31,14 @@ def compute_mp_mask_pressure_balance(
     """
     ds = xr.open_dataset(f_3d)
 
-    # ---- coordinates (same as your fetch_coords, compact) ----
-    xmin, xmax, dx = float(ds.full_xmin), float(ds.full_xmax), float(ds.full_dx)
-    ymin, ymax, dy = float(ds.full_ymin), float(ds.full_ymax), float(ds.full_dy)
-    zmin, zmax, dz = float(ds.full_zmin), float(ds.full_zmax), float(ds.full_dz)
+    # ---- coordinates ----
+    # xmin, xmax, dx = float(ds.full_xmin), float(ds.full_xmax), float(ds.full_dx)
+    # ymin, ymax, dy = float(ds.full_ymin), float(ds.full_ymax), float(ds.full_dy)
+    # zmin, zmax, dz = float(ds.full_zmin), float(ds.full_zmax), float(ds.full_dz)
 
-    x_coords = np.arange(xmin, xmax, dx) / RM_M
-    y_coords = np.arange(ymin, ymax, dy) / RM_M
-    z_coords = np.arange(zmin, zmax, dz) / RM_M
+    x_coords = ds.Nx.values*1e3 / RM_M
+    y_coords = ds.Ny.values*1e3 / RM_M
+    z_coords = ds.Nz.values*1e3 / RM_M
 
     # ---- fields (transpose Nz, Ny, Nx -> Nx, Ny, Nz) ----
     def t3(v):  # helper
@@ -64,7 +66,7 @@ def compute_mp_mask_pressure_balance(
     # ---- exclusion volume ----
     Xg, Yg, Zg = np.meshgrid(x_coords, y_coords, z_coords, indexing="ij")
     Rg = np.sqrt(Xg**2 + Yg**2 + Zg**2)
-    outside_body = (Rg >= r_min_rm) & (Rg < r_max_rm)
+    outside_body = (Rg >= r_min_rm)  #  & (Rg < r_max_rm)
 
     # ---- P_B (Pa) ----
     B_T = np.sqrt(BX**2 + BY**2 + BZ**2) * NT_TO_T
@@ -98,16 +100,33 @@ def compute_mp_mask_pressure_balance(
 
     equal_mask = np.abs(PB_pa - Pdyn_pa) <= (rel_tol * denom_bal + abs_tol_pa)
     mp_mask = equal_mask & outside_body
+    mp_mask[Rg >= r_max_rm] = False
 
     # mask out invalids
     PB_pa = np.where(outside_body, PB_pa, np.nan)
     Pdyn_pa = np.where(outside_body, Pdyn_pa, np.nan)
 
     if debug:
+        # fraction of points in mask
         frac = np.nanmean(mp_mask.astype(float))
         print(f"PB (Pa) min/med/max: {np.nanmin(PB_pa):.3e}, {np.nanmedian(PB_pa):.3e}, {np.nanmax(PB_pa):.3e}")
         print(f"Pdyn (Pa) min/med/max: {np.nanmin(Pdyn_pa):.3e}, {np.nanmedian(Pdyn_pa):.3e}, {np.nanmax(Pdyn_pa):.3e}")
         print(f"MP boundary fraction (within tol): {frac:.3e}")
+
+        # ---- scatter plot of masked points ----
+        # get coordinates of masked points
+        X_masked = Xg[mp_mask]
+        Y_masked = Yg[mp_mask]
+        Z_masked = Zg[mp_mask]
+
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(X_masked, Y_masked, Z_masked, c='red', s=5, alpha=0.6)
+        ax.set_xlabel('X [RM]')
+        ax.set_ylabel('Y [RM]')
+        ax.set_zlabel('Z [RM]')
+        ax.set_title('Magnetopause Mask Points')
+        plt.show()
 
     mp_mask_da = xr.DataArray(
         mp_mask.astype(np.uint8),

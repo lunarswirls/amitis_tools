@@ -144,6 +144,15 @@ def trace_field_line_rk(seed, Vx, Vy, Vz, x_grid, y_grid, z_grid, RM, max_steps=
     exit_y_boundary : bool
         True if the trajectory exits through the y-boundary.
     """
+    # Ensure all inputs are float64
+    seed = np.asarray(seed, dtype=np.float64)
+    Vx = np.asarray(Vx, dtype=np.float64)
+    Vy = np.asarray(Vy, dtype=np.float64)
+    Vz = np.asarray(Vz, dtype=np.float64)
+    x_grid = np.asarray(x_grid, dtype=np.float64)
+    y_grid = np.asarray(y_grid, dtype=np.float64)
+    z_grid = np.asarray(z_grid, dtype=np.float64)
+    h = np.float64(h)
 
     # Preallocate array to store the trajectory
     traj = np.empty((max_steps, 3), dtype=np.float64)
@@ -191,6 +200,117 @@ def trace_field_line_rk(seed, Vx, Vy, Vz, x_grid, y_grid, z_grid, RM, max_steps=
 
     # Return the full trajectory if max_steps is reached
     return traj, exit_y_boundary
+
+
+@njit
+def trace_field_line_rk_shell(
+    seed, Vx, Vy, Vz, x_grid, y_grid, z_grid,
+    Rcore, Rsurface,
+    max_steps=5000, h=50.0,
+    loop_tol=100.0,   # distance tol for detecting return to seed
+    shell_min_frac=0.0, shell_max_frac=1.0
+):
+    """
+    Trace a field line using RK45 without stopping at the surface, and
+    detect closure within a spherical shell between Rcore and Rsurface.
+
+    Parameters
+    ----------
+    seed : array-like (3,)
+        Starting position of the field line.
+    Vx, Vy, Vz : ndarray
+        Vector field components defined on a 3D grid.
+    x_grid, y_grid, z_grid : ndarray
+        Coordinate grids corresponding to the vector field.
+    Rcore : float
+        Inner radius of the shell (e.g., core radius).
+    Rsurface : float
+        Outer radius of the shell (e.g., planetary surface).
+    max_steps : int
+        Maximum number of integration steps.
+    h : float
+        Step size for the RK45 integrator (same sign sets direction).
+    loop_tol : float
+        Distance tolerance: if the line comes back within this distance
+        of the seed inside the shell, it is considered closed.
+    shell_min_frac, shell_max_frac : float
+        Optional factors to restrict detection to a sub-shell:
+        radius in [Rcore + shell_min_frac*(Rsurface-Rcore),
+                   Rcore + shell_max_frac*(Rsurface-Rcore)].
+
+    Returns
+    -------
+    traj : ndarray (n, 3)
+        Traced positions along the field line.
+    terminated_reason : int
+        0 = max_steps reached
+        1 = exited x or z grid boundary
+        2 = exited y grid boundary
+        3 = vector field vanished
+        4 = detected closure within shell
+    closed_in_shell : bool
+        True if a loop closure within the shell was detected.
+    """
+
+    seed = np.asarray(seed, dtype=np.float64)
+    Vx = np.asarray(Vx, dtype=np.float64)
+    Vy = np.asarray(Vy, dtype=np.float64)
+    Vz = np.asarray(Vz, dtype=np.float64)
+    x_grid = np.asarray(x_grid, dtype=np.float64)
+    y_grid = np.asarray(y_grid, dtype=np.float64)
+    z_grid = np.asarray(z_grid, dtype=np.float64)
+    h = np.float64(h)
+
+    traj = np.empty((max_steps, 3), dtype=np.float64)
+    traj[0] = seed
+    r = seed.copy()
+
+    closed_in_shell = False
+    terminated_reason = 0
+
+    # Define shell radii range where we look for closure
+    shell_r_min = Rcore + shell_min_frac * (Rsurface - Rcore)
+    shell_r_max = Rcore + shell_max_frac * (Rsurface - Rcore)
+
+    for i in range(1, max_steps):
+
+        V = get_V(r, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+
+        # Stop if vector field vanishes
+        if np.all(V == 0.0):
+            terminated_reason = 3
+            return traj[:i], terminated_reason, closed_in_shell
+
+        r_next = rk45_step(get_V, r, h, Vx, Vy, Vz, x_grid, y_grid, z_grid)
+        traj[i] = r_next
+        r = r_next
+
+        rmag = np.linalg.norm(r)
+
+        # Check for closure within shell:
+        # line comes back near the seed, and is located in the chosen shell region
+        if (rmag >= shell_r_min) and (rmag <= shell_r_max):
+            dist_to_seed = np.linalg.norm(r - seed)
+            if dist_to_seed <= loop_tol:
+                closed_in_shell = True
+                terminated_reason = 4
+                return traj[:i+1], terminated_reason, closed_in_shell
+
+        # Check grid boundaries: x and z first
+        if (r[0] < x_grid[0]) or (r[0] > x_grid[-1]) or \
+           (r[2] < z_grid[0]) or (r[2] > z_grid[-1]):
+            terminated_reason = 1
+            return traj[:i+1], terminated_reason, closed_in_shell
+
+        # y-boundary
+        if (r[1] < y_grid[0]) or (r[1] > y_grid[-1]):
+            terminated_reason = 2
+            return traj[:i+1], terminated_reason, closed_in_shell
+
+    # Max steps reached
+    terminated_reason = 0
+    return traj, terminated_reason, closed_in_shell
+
 
 @njit
 def classify(traj_fwd, traj_bwd, RM, exit_fwd_y=False, exit_bwd_y=False):
