@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import numpy as np
 
-case = "CPS"
+case = "RPS"
 mode = "HNHV"
 sim_steps = list(range(105000, 350000 + 1, 1000))
 # sim_steps = list(range(193000, 350000 + 1, 1000))

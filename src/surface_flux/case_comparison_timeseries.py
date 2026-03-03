@@ -328,7 +328,7 @@ def save_triptych_multicases(
             if scatter:
                 ax.scatter(t, total, s=22, color=sty["color"], marker="*", label=lbl_total)
             else:
-                ax.plot(t, total, lw=2.5, color=sty["color"], ls=sty["ls"], label=lbl_total)
+                ax.plot(t, total, lw=2.0, color=sty["color"], ls=sty["ls"], label=lbl_total)
 
         ax.set_xlabel("Time (s)")
         ax.set_ylabel(ylabels[j])
@@ -381,7 +381,7 @@ def save_triptych_species_group(
             if scatter:
                 ax.scatter(t, group_sum, s=22, color=sty["color"], marker="o", label=lbl)
             else:
-                ax.plot(t, group_sum, lw=2.2, color=sty["color"], ls=sty["ls"], label=lbl)
+                ax.plot(t, group_sum, lw=1.5, color=sty["color"], ls=sty["ls"], label=lbl)
 
         ax.set_xlabel("Time (s)")
         ax.set_ylabel(ylabels[j])
@@ -441,7 +441,7 @@ def save_stats_triptych_multicases(
             ax.plot(
                 t,
                 total,
-                lw=2.5,
+                lw=1.5,
                 color=sty["color"],
                 ls=sty["ls"],
                 label=f"{case.split('_')[0]} total",
@@ -508,7 +508,7 @@ def save_stats_2panel_multicases(
             ax.plot(
                 t,
                 total,
-                lw=2.5,
+                lw=1.5,
                 color=sty["color"],
                 ls=sty["ls"],
                 label=f"{case.split('_')[0]} total",
