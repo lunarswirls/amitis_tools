@@ -22,9 +22,9 @@ import scipy.sparse.linalg as spla
 debug = False
 plotlog = True
 branch = "HNHV"
-case = "PN"
+case = "PS"
 # 115000 (pre) or 142000 (transient) or 174000 (post) or 350000 (new)
-step = 174000
+step = 115000
 
 # set up variables for each case
 case_r = f"R{case}"
@@ -56,15 +56,15 @@ if 0:
                 ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_HNHV_{step}_xz_comp.nc")
 
 if "HN" in branch:
-    input_folder_r = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case_r}_HNHV/plane_product/object/"
-    input_folder_c = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case_c}_HNHV/plane_product/object/"
-    ncfile_r = os.path.join(input_folder_r, f"Amitis_{case_r}_HNHV_{step}_xz_comp.nc")
-    ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_HNHV_{step}_xz_comp.nc")
+    input_folder_r = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case_r}_HNHV/plane_product/cube/"
+    input_folder_c = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case_c}_HNHV/plane_product/cube/"
+    ncfile_r = os.path.join(input_folder_r, f"Amitis_{case_r}_HNHV_{step}_merged_4RM.nc")
+    ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_HNHV_{step}_merged_4RM.nc")
 else:
-    input_folder_r = f"/Volumes/data_backup/mercury/extreme/{case_r}_Base/plane_product/object/"
-    input_folder_c = f"/Volumes/data_backup/mercury/extreme/{case_c}_Base/plane_product/object/"
-    ncfile_r = os.path.join(input_folder_r, f"Amitis_{case_r}_Base_{step}_xz_comp.nc")
-    ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_Base_{step}_xz_comp.nc")
+    input_folder_r = f"/Volumes/data_backup/mercury/extreme/{case_r}_Base/plane_product/cube/"
+    input_folder_c = f"/Volumes/data_backup/mercury/extreme/{case_c}_Base/plane_product/cube/"
+    ncfile_r = os.path.join(input_folder_r, f"Amitis_{case_r}_Base_{step}_merged_4RM.nc")
+    ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_Base_{step}_merged_4RM.nc")
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/induced_bfield_topology/{case_c}-{case_r}_{branch}/"
 os.makedirs(output_folder, exist_ok=True)
@@ -134,12 +134,12 @@ start = datetime.now()
 print(f"Loaded conductive core at {str(start)}")
 
 # --------------------------
-# CORE FIELD (common dipole)
+# DC FIELD (common dipole)
 # --------------------------
-# You said you can get the core field as:
+# get the core field as:
 #   B_core = B_tot - B_ext
-# where B_ext is the non-core part in your outputs.
-# If the core dipole is identical between runs, B_core_r and B_core_c should match closely.
+# where B_ext is the non-core part of output
+# core dipole is identical between runs, B_core_r and B_core_c should be the same
 Bx_core = BxTot_r - BxExt_r
 By_core = ByTot_r - ByExt_r
 Bz_core = BzTot_r - BzExt_r
@@ -151,13 +151,12 @@ Jx_nA = Jx_nA_c - Jx_nA_r
 Jy_nA = Jy_nA_c - Jy_nA_r
 Jz_nA = Jz_nA_c - Jz_nA_r
 
-# This contains the signed change in *total* field between runs.
-# If the two runs share the same core dipole and the same driver field setup,
-# then this is effectively the induced-field contribution that appears due to conductivity.
+# This contains the signed change in *total* field between runs
+# If the two runs share the same core dipole and the same driving field setup
+# then this is effectively the induced-field contribution that appears due to conductivity
 Bx_nT = BxTot_c - BxTot_r
 By_nT = ByTot_c - ByTot_r
 Bz_nT = BzTot_c - BzTot_r
-# TODO: need signed diffs to see what is being removed
 
 
 def idx_range(coord_km, lo, hi):
@@ -306,7 +305,7 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
                             use_jacobi=True):
     """
     Compute magnetic field B(x,y,z) from a 3-D current density J(x,y,z) without FFT.
-    This is a magnetostatic / Biot–Savart-like solve on a non-periodic box.
+    This is a magnetostatic / Biot–Savart-like solve on a non-periodic box
 
     Method (real space via vector potential):
         1) Solve Poisson for A:
@@ -317,9 +316,9 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
 
     Notes / assumptions:
     - Boundary conditions: this effectively enforces A=0 on the outer box
-      (homogeneous Dirichlet).
+      (homogeneous Dirichlet)
     - This avoids periodic wrap-around in FFT, but still need padding so that
-      induced B in the interior is not dominated by the artificial boundary.
+      induced B in the interior is not dominated by the artificial boundary
 
     Solver details:
     - Uses conjugate gradient (CG) on (-∇²)A = μ0 J which is SPD
@@ -329,9 +328,9 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
     Parameters
     ----------
     x_km, y_km, z_km : 1-D arrays
-        Coordinates along each axis in kilometers.
+        Coordinates along each axis in kilometers
     Jx_nA, Jy_nA, Jz_nA : 3-D arrays, shape (Nx, Ny, Nz)
-        Current density components on the grid in nA/m^2.
+        Current density components on the grid in nA/m^2
     rtol, atol : float
         CG stopping criteria
     maxiter : int
@@ -339,7 +338,7 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
     edge_order : int (1 or 2)
         Order used by np.gradient at the boundaries
     use_jacobi : bool
-        If True, use a diagonal (Jacobi) preconditioner.
+        If True, use a diagonal (Jacobi) preconditioner
 
     Returns
     -------
@@ -436,7 +435,7 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
 bstart = datetime.now()
 Bx_sub, By_sub, Bz_sub = B_from_J_poisson_lowmem(
     x_sub, y_sub, z_sub, Jx_sub, Jy_sub, Jz_sub,
-    rtol=1e-15, atol=0.0, maxiter=2000, edge_order=1, use_jacobi=True
+    rtol=1e-9, atol=0.0, maxiter=10000, edge_order=1, use_jacobi=True
 )
 bend = datetime.now()
 print(f"Computed B everywhere (Poisson) from J at {str(bend)}; elapsed={(bend-bstart)}")
@@ -467,8 +466,8 @@ Bzcore_box = Bzcore_sub[sx2, sy2, sz2]
 # --------------------------
 # SIGNED INDUCED CONTRIBUTION ALONG CORE
 # --------------------------
-# This is the key quantity you want: the induced field difference (conductive-resistive)
-# projected onto the core-field direction. Positive => reinforces core, negative => opposes.
+# the induced field difference (conductive-resistive) projected onto the core-field direction
+# Positive => reinforces core, negative => opposes
 eps = 1e-30
 Bcore_mag = np.sqrt(Bxcore_box*Bxcore_box + Bycore_box*Bycore_box + Bzcore_box*Bzcore_box) + eps
 bxhat = Bxcore_box / Bcore_mag
@@ -802,8 +801,8 @@ print("Saved:", out_png)
 # --------------------------
 # NEW FIGURE: signed induced contribution along core direction
 # --------------------------
-# We plot Bind_parallel on the same three slices. This is a scalar field, so use imshow/pcolormesh.
-# Positive => induced field reinforces the core dipole; negative => it opposes it.
+# We plot Bind_parallel on the same three slices. This is a scalar field, so use imshow/pcolormesh
+# Positive => induced field reinforces the core dipole; negative => opposes it
 
 # slices of Bind_parallel (nT)
 Bp_xy = Bind_parallel[:, :, iz0].T
