@@ -8,11 +8,11 @@ import src.bs_mp_finder.mp_pressure_utils as boundary_utils
 # ----------------------------
 # SETTINGS
 # ----------------------------
-debug = False
+debug = True
 
-case = "RPS"
+case = "CPS"
 mode = "HNHV"
-sim_steps = range(105000, 350000 + 1, 1000)
+sim_steps = range(105000, 108000 + 1, 1000)
 
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/magnetopause_3D_timeseries/{case}_{mode}/"
 os.makedirs(out_dir, exist_ok=True)
@@ -20,7 +20,7 @@ os.makedirs(out_dir, exist_ok=True)
 # mask finder params
 rmin_rm = 1.0
 rmax_rm = 2.5
-rel_tol = 0.15
+rel_tol = 0.1
 abs_tol_mp_pressure = 0.0
 
 # time conversion
@@ -132,11 +132,12 @@ encoding = {
     "z": {"dtype": "float32"},
 }
 
-ds_out.to_netcdf(
-    out_nc,
-    format="NETCDF4",
-    engine="netcdf4",
-    encoding=encoding
-)
+if 0:
+    ds_out.to_netcdf(
+        out_nc,
+        format="NETCDF4",
+        engine="netcdf4",
+        encoding=encoding
+    )
 
-print("Saved:", out_nc)
+    print("Saved:", out_nc)

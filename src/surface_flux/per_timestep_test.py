@@ -10,13 +10,22 @@ import src.surface_flux.flux_utils as flux_utils
 # -----------------------
 # Upstream conditions
 # -----------------------
-case = "CPN_HNHV"
-species = np.array(['H+', 'H+', 'He++', 'He++'])
-sim_ppc = np.array([24, 24, 11, 11], dtype=float)  # macroparticles per cell
-sim_den = np.array([38.0e6, 76.0e6, 1.0e6, 2.0e6], dtype=float)  # particles/m^3
-sim_vel = np.array([400.e3, 700.0e3, 400.e3, 700.0e3], dtype=float)  # m/s
-species_mass = np.array([1.0, 1.0, 4.0, 4.0], dtype=float)
-species_charge = np.array([1.0, 1.0, 2.0, 2.0], dtype=float)
+if 0:
+    case = "CPN_HNHV"
+    species = np.array(['H+', 'H+', 'He++', 'He++'])
+    sim_ppc = np.array([24, 24, 11, 11], dtype=float)  # macroparticles per cell
+    sim_den = np.array([38.0e6, 76.0e6, 1.0e6, 2.0e6], dtype=float)  # particles/m^3
+    sim_vel = np.array([400.e3, 700.0e3, 400.e3, 700.0e3], dtype=float)  # m/s
+    species_mass = np.array([1.0, 1.0, 4.0, 4.0], dtype=float)
+    species_charge = np.array([1.0, 1.0, 2.0, 2.0], dtype=float)
+
+case = "CPN_BNBV_extendedX"
+species = np.array(['H+', 'H+'])
+sim_ppc = np.array([9, 9], dtype=float)  # macroparticles per cell
+sim_den = np.array([38.0e6, 38.0e6], dtype=float)  # particles/m^3
+sim_vel = np.array([400.e3, 550.0e3], dtype=float)  # m/s
+species_mass = np.array([1.0, 1.0], dtype=float)
+species_charge = np.array([1.0, 1.0], dtype=float)
 
 AMU = 1.66053906660e-27  # kg
 QE  = 1.602176634e-19    # J/eV
@@ -25,17 +34,22 @@ QE  = 1.602176634e-19    # J/eV
 m_kg_by_sid = species_mass * AMU                 # (Ns,)
 
 # Simulation grid and obstacle radius
-sim_dx = 75.e3
-sim_dy = 75.e3
-sim_dz = 75.e3
+if 0:
+    sim_dx = 75.e3
+    sim_dy = 75.e3
+    sim_dz = 75.e3
+
+sim_dx = 100.e3
+sim_dy = 100.e3
+sim_dz = 100.e3
 R_M = 2440.e3
 DELTA_R_M = 0.5 * sim_dx
 
 # -----------------------
 # SETTINGS
 # -----------------------
-npz_glob = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/precipitation_timeseries/*.npz"
-
+# npz_glob = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/precipitation_timeseries/*.npz"
+npz_glob = f"/Volumes/data_backup/mercury/extreme/CPN_BNBV_extendedX/precipitation_timeseries/*.npz"
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/surface_flux_maps_test/{case}/"
 os.makedirs(out_dir, exist_ok=True)
 
@@ -52,7 +66,8 @@ lon_centers = 0.5 * (lon_bin_edges[:-1] + lon_bin_edges[1:])
 plot_log10 = True
 eps = 1e-30
 CMAP = "jet"
-save_per_species = True
+save_per_species = False
+save_combo_species = False
 
 # Fixed log10 color scales (global)
 NF_VMIN, NF_VMAX = 10.0, 14.0    # log10(#/m^2/s)
@@ -366,59 +381,59 @@ for i, f in enumerate(files):
                 cbar_label="log10(W/m²)",
                 vmin=EF_VMIN, vmax=EF_VMAX
             )
+    if save_combo_species:
+        # Combo maps (with separate nf/mf/ef dirs)
+        combos = [
+            ((0, 1), "protons_sid00_01_sum", "H+ (sid00+sid01)",
+             (NF_PROTON_VMIN, NF_PROTON_VMAX),
+             (MF_PROTON_VMIN, MF_PROTON_VMAX),
+             (EF_PROTON_VMIN, EF_PROTON_VMAX)),
+            ((2, 3), "alphas_sid02_03_sum", "He++ (sid02+sid03)",
+             (NF_ALPHA_VMIN, NF_ALPHA_VMAX),
+             (MF_ALPHA_VMIN, MF_ALPHA_VMAX),
+             (EF_ALPHA_VMIN, EF_ALPHA_VMAX)),
+        ]
 
-    # Combo maps (with separate nf/mf/ef dirs)
-    combos = [
-        ((0, 1), "protons_sid00_01_sum", "H+ (sid00+sid01)",
-         (NF_PROTON_VMIN, NF_PROTON_VMAX),
-         (MF_PROTON_VMIN, MF_PROTON_VMAX),
-         (EF_PROTON_VMIN, EF_PROTON_VMAX)),
-        ((2, 3), "alphas_sid02_03_sum", "He++ (sid02+sid03)",
-         (NF_ALPHA_VMIN, NF_ALPHA_VMAX),
-         (MF_ALPHA_VMIN, MF_ALPHA_VMAX),
-         (EF_ALPHA_VMIN, EF_ALPHA_VMAX)),
-    ]
+        for (s0, s1), combo_dirname, combo_label, (nf_vmin, nf_vmax), (mf_vmin, mf_vmax), (ef_vmin, ef_vmax) in combos:
+            combo_root = os.path.join(out_dir, combo_dirname)
 
-    for (s0, s1), combo_dirname, combo_label, (nf_vmin, nf_vmax), (mf_vmin, mf_vmax), (ef_vmin, ef_vmax) in combos:
-        combo_root = os.path.join(out_dir, combo_dirname)
+            nf_dir = os.path.join(combo_root, "nf")
+            mf_dir = os.path.join(combo_root, "mf")
+            ef_dir = os.path.join(combo_root, "ef")
 
-        nf_dir = os.path.join(combo_root, "nf")
-        mf_dir = os.path.join(combo_root, "mf")
-        ef_dir = os.path.join(combo_root, "ef")
+            os.makedirs(nf_dir, exist_ok=True)
+            os.makedirs(mf_dir, exist_ok=True)
+            os.makedirs(ef_dir, exist_ok=True)
 
-        os.makedirs(nf_dir, exist_ok=True)
-        os.makedirs(mf_dir, exist_ok=True)
-        os.makedirs(ef_dir, exist_ok=True)
+            nf_combo = flux_utils.nan_safe_sum2(flux_by_sid[s0], flux_by_sid[s1])
+            out_nf = os.path.join(nf_dir, f"{base}_number_flux_{combo_dirname}.png")
+            save_flux_map_png(
+                out_nf, lon_bin_edges, lat_bin_edges, nf_combo,
+                title=f"{case.replace('_', ' ')} {combo_label} surface number flux, t={t:.3f} s",
+                plot_log10=True, eps=eps, cmap=CMAP,
+                cbar_label="log10(#/m²/s)",
+                vmin=nf_vmin, vmax=nf_vmax
+            )
 
-        nf_combo = flux_utils.nan_safe_sum2(flux_by_sid[s0], flux_by_sid[s1])
-        out_nf = os.path.join(nf_dir, f"{base}_number_flux_{combo_dirname}.png")
-        save_flux_map_png(
-            out_nf, lon_bin_edges, lat_bin_edges, nf_combo,
-            title=f"{case.replace('_', ' ')} {combo_label} surface number flux, t={t:.3f} s",
-            plot_log10=True, eps=eps, cmap=CMAP,
-            cbar_label="log10(#/m²/s)",
-            vmin=nf_vmin, vmax=nf_vmax
-        )
+            mf_combo = flux_utils.nan_safe_sum2(mass_flux_by_sid[s0], mass_flux_by_sid[s1])
+            out_mf = os.path.join(mf_dir, f"{base}_mass_flux_{combo_dirname}.png")
+            save_flux_map_png(
+                out_mf, lon_bin_edges, lat_bin_edges, mf_combo,
+                title=f"{case.replace('_', ' ')} {combo_label} surface mass flux, t={t:.3f} s",
+                plot_log10=True, eps=mass_eps, cmap="magma",
+                cbar_label="log10(kg/m²/s)",
+                vmin=mf_vmin, vmax=mf_vmax
+            )
 
-        mf_combo = flux_utils.nan_safe_sum2(mass_flux_by_sid[s0], mass_flux_by_sid[s1])
-        out_mf = os.path.join(mf_dir, f"{base}_mass_flux_{combo_dirname}.png")
-        save_flux_map_png(
-            out_mf, lon_bin_edges, lat_bin_edges, mf_combo,
-            title=f"{case.replace('_', ' ')} {combo_label} surface mass flux, t={t:.3f} s",
-            plot_log10=True, eps=mass_eps, cmap="magma",
-            cbar_label="log10(kg/m²/s)",
-            vmin=mf_vmin, vmax=mf_vmax
-        )
-
-        ef_combo = flux_utils.nan_safe_sum2(energy_flux_by_sid[s0], energy_flux_by_sid[s1])
-        out_ef = os.path.join(ef_dir, f"{base}_energy_flux_{combo_dirname}.png")
-        save_flux_map_png(
-            out_ef, lon_bin_edges, lat_bin_edges, ef_combo,
-            title=f"{case.replace('_', ' ')} {combo_label} surface energy flux, t={t:.3f} s",
-            plot_log10=True, eps=energy_eps, cmap="plasma",
-            cbar_label="log10(W/m²)",
-            vmin=ef_vmin, vmax=ef_vmax
-        )
+            ef_combo = flux_utils.nan_safe_sum2(energy_flux_by_sid[s0], energy_flux_by_sid[s1])
+            out_ef = os.path.join(ef_dir, f"{base}_energy_flux_{combo_dirname}.png")
+            save_flux_map_png(
+                out_ef, lon_bin_edges, lat_bin_edges, ef_combo,
+                title=f"{case.replace('_', ' ')} {combo_label} surface energy flux, t={t:.3f} s",
+                plot_log10=True, eps=energy_eps, cmap="plasma",
+                cbar_label="log10(W/m²)",
+                vmin=ef_vmin, vmax=ef_vmax
+            )
 
     # vrabs map
     vrabs_dir = os.path.join(out_dir, "radial_velocity")
