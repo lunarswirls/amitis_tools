@@ -1,9 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import xarray as xr
 import numpy as np
 import os
 
 # cases = ["RPN_HNHV", "CPN_HNHV", "CPS_HNHV", "RPS_HNHV"]
-cases = ["RPN_Base", "RPS_Base", "CPS_Base"]
+# cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
+cases = ["RPS_Base"]
 
 for case in cases:
     try:
@@ -20,9 +23,9 @@ for case in cases:
         ]
 
         if "Base" in case:
-            base_path = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/"
-            output_path = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/cube/"
-            simsteps = list(range(105000, 115000 + 1, 1000))
+            base_path = f"/Volumes/T9/mercury/extreme/{case}/plane_product/"
+            output_path = f"/Volumes/T9/mercury/extreme/{case}/plane_product/cube/"
+            simsteps = list(range(85000, 104000 + 1, 1000))
         elif "HNHV" in case:
             base_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/"
             output_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/cube/"
@@ -70,13 +73,13 @@ for case in cases:
         base_time = np.datetime64('2000-01-01T00:00:00')
 
         for simstep in simsteps:
-            print(f"\nProcessing simstep {simstep}")
+            print(f"\nProcessing simstep {"%06d" % simstep}")
 
             try:
                 paths = {
-                    'xy': os.path.join(base_path, f'all_xy/Amitis_{case}_{simstep}_xy_comp.nc'),
-                    'xz': os.path.join(base_path, f'all_xz/Amitis_{case}_{simstep}_xz_comp.nc'),
-                    'yz': os.path.join(base_path, f'all_yz/Amitis_{case}_{simstep}_yz_comp.nc')
+                    'xy': os.path.join(base_path, f'all_xy/Amitis_{case}_{"%06d" % simstep}_xy_comp.nc'),
+                    'xz': os.path.join(base_path, f'all_xz/Amitis_{case}_{"%06d" % simstep}_xz_comp.nc'),
+                    'yz': os.path.join(base_path, f'all_yz/Amitis_{case}_{"%06d" % simstep}_yz_comp.nc')
                 }
 
                 ds_xy = load_plane_trim(paths['xy'])

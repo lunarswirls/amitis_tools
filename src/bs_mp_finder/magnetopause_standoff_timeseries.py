@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 # ============================================================
 debug = False
 
-cases = ["RPS_HNHV", "CPS_HNHV"]
+cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
 
 for c in cases:
     case = c

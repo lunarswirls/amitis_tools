@@ -8,11 +8,11 @@ import src.bs_mp_finder.mp_pressure_utils as boundary_utils
 # ----------------------------
 # SETTINGS
 # ----------------------------
-debug = True
+debug = False
 
-case = "CPS"
+case = "RPS"
 mode = "HNHV"
-sim_steps = range(105000, 108000 + 1, 1000)
+sim_steps = range(85000, 104000 + 1, 1000)
 
 out_dir = f"/Users/danywaller/Projects/mercury/extreme/magnetopause_3D_timeseries/{case}_{mode}/"
 os.makedirs(out_dir, exist_ok=True)
@@ -35,10 +35,10 @@ out_nc = os.path.join(out_dir, f"{case}_{mode}_mp_mask_timeseries.nc")
 def build_file_path(sim_step: int) -> str:
     if sim_step <= 115000:
         fmode = "Base"
-        input_folder = f"/Volumes/data_backup/mercury/extreme/{case}_Base/plane_product/cube/"
+        input_folder = f"/Volumes/T9/mercury/extreme/{case}_Base/plane_product/cube/"
     else:
         fmode = "HNHV"
-        input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/cube/"
+        input_folder = f"/Volumes/T9/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/cube/"
     return os.path.join(input_folder, f"Amitis_{case}_{fmode}_{sim_step:06d}_merged_4RM.nc")
 
 # ----------------------------
@@ -90,9 +90,9 @@ if len(mp_masks) == 0:
 mp_mask_4d = np.stack(mp_masks, axis=0)
 
 # ----------------------------
-# BUILD DATASET + SAVE
+# BUILD DATASET
 # ----------------------------
-ds_out = xr.Dataset(
+ds_new = xr.Dataset(
     data_vars=dict(
         mp_mask=(("time", "x", "y", "z"), mp_mask_4d),
     ),
@@ -115,14 +115,46 @@ ds_out = xr.Dataset(
     )
 )
 
-ds_out["mp_mask"].attrs.update(
+ds_new["mp_mask"].attrs.update(
     dict(
         long_name="magnetopause_mask",
         values="0=outside, 1=inside",
     )
 )
 
-# compression encoding (zlib level 4)
+# ----------------------------
+# MERGE WITH EXISTING FILE
+# ----------------------------
+if os.path.exists(out_nc):
+    print("Existing file found — appending new timesteps")
+
+    ds_old = xr.open_dataset(out_nc)
+    ds_old.load()
+    ds_old.close()
+
+    if not (
+        np.allclose(ds_old.x.values, ds_new.x.values)
+        and np.allclose(ds_old.y.values, ds_new.y.values)
+        and np.allclose(ds_old.z.values, ds_new.z.values)
+    ):
+        raise ValueError("Existing file grid differs from new data.")
+
+    new_times = ds_new.time.values
+    old_times = ds_old.time.values
+    keep_mask = ~np.isin(new_times, old_times)
+
+    ds_new = ds_new.isel(time=keep_mask)
+
+    if ds_new.sizes["time"] == 0:
+        print("No new timesteps to append.")
+        ds_out = ds_old
+    else:
+        ds_out = xr.concat([ds_old, ds_new], dim="time")
+        ds_out = ds_out.sortby("time")
+
+# ----------------------------
+# SAVE DATASET
+# ----------------------------
 comp = dict(zlib=True, complevel=4)
 encoding = {
     "mp_mask": {**comp, "dtype": "uint8"},
@@ -132,12 +164,15 @@ encoding = {
     "z": {"dtype": "float32"},
 }
 
-if 0:
-    ds_out.to_netcdf(
-        out_nc,
-        format="NETCDF4",
-        engine="netcdf4",
-        encoding=encoding
-    )
+tmp_nc = out_nc + ".tmp"
 
-    print("Saved:", out_nc)
+ds_out.to_netcdf(
+    tmp_nc,
+    format="NETCDF4",
+    engine="netcdf4",
+    encoding=encoding
+)
+
+os.replace(tmp_nc, out_nc)
+
+print("Saved:", out_nc)

@@ -26,9 +26,9 @@ sid02, sid03: He++  (two populations)
 
 import os
 import glob
+import csv
 import numpy as np
 import matplotlib.pyplot as plt
-
 import src.surface_flux.flux_utils as flux_utils
 
 
@@ -530,6 +530,95 @@ def save_stats_2panel_multicases(
 
 
 # =============================================================================
+# Helpers to save CSVs of stats
+# =============================================================================
+def save_stats_total_csv(outpath, times, stats_ts):
+    """
+    Save total-map statistics time series to CSV.
+    """
+    keys = list(stats_ts.keys())
+
+    with open(outpath, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["time"] + keys)
+
+        for i, t in enumerate(times):
+            row = [t] + [stats_ts[k][i] for k in keys]
+            writer.writerow(row)
+
+
+def save_stats_by_sid_csv(outpath, times, stats_by_sid_ts, species):
+    """
+    Save per-sid statistics time series.
+    One row per time per species id.
+    """
+    keys = list(stats_by_sid_ts.keys())
+
+    with open(outpath, "w", newline="") as f:
+        writer = csv.writer(f)
+
+        header = ["time", "sid", "species"] + keys
+        writer.writerow(header)
+
+        nt = len(times)
+        ns = len(species)
+
+        for i in range(nt):
+            for s in range(ns):
+                row = [times[i], s, species[s]]
+                row += [stats_by_sid_ts[k][i, s] for k in keys]
+                writer.writerow(row)
+
+
+def save_integrated_timeseries_csv(
+        outpath,
+        times,
+        total_rates, total_rates_by_sid,
+        total_mass_rates, total_mass_rates_by_sid,
+        total_powers, total_powers_by_sid,
+        species):
+    """
+    Save integrated number/mass/energy precipitation time series.
+    """
+    ns = len(species)
+
+    header = [
+        "time",
+        "total_number_rate",
+        "total_mass_rate",
+        "total_energy_power",
+    ]
+
+    for s in range(ns):
+        header += [
+            f"sid{s:02d}_number_rate",
+            f"sid{s:02d}_mass_rate",
+            f"sid{s:02d}_energy_power",
+        ]
+
+    with open(outpath, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+
+        for i, t in enumerate(times):
+            row = [
+                t,
+                total_rates[i],
+                total_mass_rates[i],
+                total_powers[i],
+            ]
+
+            for s in range(ns):
+                row += [
+                    total_rates_by_sid[i, s],
+                    total_mass_rates_by_sid[i, s],
+                    total_powers_by_sid[i, s],
+                ]
+
+            writer.writerow(row)
+
+
+# =============================================================================
 # PER-CASE DATA STORAGE (for cross-case plots)
 # =============================================================================
 all_cases_ts = {}            # integrated number/mass/energy time series
@@ -936,6 +1025,45 @@ for case in cases:
         stats_protons_ts[k] = stats_protons_ts[k][order]
         stats_alphas_ts[k] = stats_alphas_ts[k][order]
 
+    # ============================================================
+    # SAVE ALL TIME-SERIES TO CSV
+    # ============================================================
+    save_integrated_timeseries_csv(
+        os.path.join(out_dir, f"{case}_integrated_timeseries.csv"),
+        times,
+        total_rates,
+        total_rates_by_sid,
+        total_mass_rates,
+        total_mass_rates_by_sid,
+        total_powers,
+        total_powers_by_sid,
+        species
+    )
+
+    save_stats_total_csv(
+        os.path.join(out_dir, f"{case}_stats_total.csv"),
+        times,
+        stats_total_ts
+    )
+
+    save_stats_by_sid_csv(
+        os.path.join(out_dir, f"{case}_stats_by_sid.csv"),
+        times,
+        stats_by_sid_ts,
+        species
+    )
+
+    save_stats_total_csv(
+        os.path.join(out_dir, f"{case}_stats_protons_sum.csv"),
+        times,
+        stats_protons_ts
+    )
+
+    save_stats_total_csv(
+        os.path.join(out_dir, f"{case}_stats_alphas_sum.csv"),
+        times,
+        stats_alphas_ts
+    )
     # -------------------------------------------------------------------------
     # Per-case plots (single-case figures)
     # -------------------------------------------------------------------------
