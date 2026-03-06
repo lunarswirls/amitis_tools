@@ -6,7 +6,7 @@ import os
 
 # cases = ["RPN_HNHV", "CPN_HNHV", "CPS_HNHV", "RPS_HNHV"]
 # cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
-cases = ["RPS_Base"]
+cases = ["CPS_HNHV"]
 
 for case in cases:
     try:

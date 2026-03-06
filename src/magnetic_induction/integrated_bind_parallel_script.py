@@ -11,8 +11,6 @@ from src.field_topology.topology_utils import trace_field_line_rk, classify
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 import matplotlib.lines as mlines
-
-# NEW (non-FFT solve)
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
@@ -72,7 +70,7 @@ os.makedirs(output_folder, exist_ok=True)
 # Planet parameters
 RM = 2440.0  # km
 plot_depth = RM
-L = 2.5 * RM         # half-width of cube of interest: [-L, +L]
+L = 4.5 * RM         # half-width of cube of interest: [-L, +L]
 buf = 0.5 * RM       # buffer to reduce periodic wrap in FFT result
 
 # Seed settings
@@ -157,6 +155,11 @@ Jz_nA = Jz_nA_c - Jz_nA_r
 Bx_nT = BxTot_c - BxTot_r
 By_nT = ByTot_c - ByTot_r
 Bz_nT = BzTot_c - BzTot_r
+
+# Fill NaNs with nearest valid (preserves physics)
+Jx_nA = np.where(np.isnan(Jx_nA), 0.0, Jx_nA)  # or use scipy.ndimage.distance_transform_edt for nearest
+Jy_nA = np.where(np.isnan(Jy_nA), 0.0, Jy_nA)
+Jz_nA = np.where(np.isnan(Jz_nA), 0.0, Jz_nA)
 
 
 def idx_range(coord_km, lo, hi):
@@ -364,6 +367,12 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
     Nx, Ny, Nz = Jx.shape
     N = Nx * Ny * Nz
 
+    if debug:
+        print("Grid spacing (m): dx,dy,dz =", dx, dy, dz)
+        print("Grid sizes: Nx,Ny,Nz,N =", Nx, Ny, Nz, N)
+        print("Jx stats: nan/min/max =", np.isnan(Jx).sum(),
+              np.nanmin(Jx), np.nanmax(Jx))
+
     # Build sparse 3-D Laplacian operator via Kronecker sums
     def D2(n, h):
         main = (-2.0) * np.ones(n)
@@ -384,6 +393,11 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
     # Use (-Lap) so the operator is SPD for CG
     Aop = (-1.0) * Lap
 
+    if debug:
+        print("Aop nnz:", Aop.nnz)
+        print("Aop shape:", Aop.shape)
+        print("Aop diag stats: min/max =", Aop.diagonal().min(), Aop.diagonal().max())
+
     # Jacobi preconditioner: M ≈ inv(Aop)
     M = None
     if use_jacobi:
@@ -395,7 +409,11 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
 
         M = spla.LinearOperator((N, N), matvec=Minv, dtype=np.float64)
 
-    def solve_component(Ji):
+    def solve_component(name, Ji):
+        if debug:
+            print(f"Solving component {name} ...")
+            print(f"{name} RHS stats: nan/min/max =",
+                  np.isnan(Ji).sum(), np.nanmin(Ji), np.nanmax(Ji))
         b = (MU0 * Ji).ravel(order="C")
         Ai, info = spla.cg(Aop, b, rtol=rtol, atol=atol, maxiter=maxiter, M=M)
         if info != 0:
@@ -403,9 +421,9 @@ def B_from_J_poisson_lowmem(x_km, y_km, z_km, Jx_nA, Jy_nA, Jz_nA,
         return Ai.reshape((Nx, Ny, Nz), order="C")
 
     # Solve Poisson for Ax, Ay, Az
-    Ax = solve_component(Jx)
-    Ay = solve_component(Jy)
-    Az = solve_component(Jz)
+    Ax = solve_component("Jx", Ji=Jx)
+    Ay = solve_component("Jy", Ji=Jy)
+    Az = solve_component("Jz", Ji=Jz)
 
     # Curl(A) -> B
     dAz_dy = np.gradient(Az, dy, axis=1, edge_order=edge_order)
