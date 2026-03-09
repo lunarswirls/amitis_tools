@@ -6,7 +6,7 @@ import numpy as np
 
 case = "RPS"
 mode = "HNHV"
-sim_steps = list(range(105000, 350000 + 1, 1000))
+sim_steps = list(range(275000, 350000 + 1, 1000))
 # sim_steps = list(range(193000, 350000 + 1, 1000))
 # sim_steps = list(range(325000, 339000 + 1, 1000))
 dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
@@ -24,17 +24,17 @@ def build_file_path(pfix: str) -> list:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/01/subset/"
     elif 140000 < sstep <= 150000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/02/subset/"
-    elif 150000 < sstep <= 175000:
+    elif 150000 < sstep <= 170000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/03/subset/"
-    elif 175000 < sstep <= 200000:
+    elif 170000 < sstep <= 195000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/04/subset/"
-    elif 200000 < sstep <= 225000:
+    elif 195000 < sstep <= 220000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/05/subset/"
     elif 225000 < sstep <= 250000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/06/subset/"
-    elif 250000 < sstep <= 275000:
+    elif 250000 < sstep < 275000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/07/subset/"
-    elif 275000 < sstep <= 300000:
+    elif 275000 <= sstep <= 300000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/08/subset/"
     elif 300000 < sstep <= 325000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/09/subset/"

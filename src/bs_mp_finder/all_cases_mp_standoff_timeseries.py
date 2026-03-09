@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # USER SETTINGS
 # ============================================================
 
-cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
+cases = ["(A) RPN_HNHV", "(B) CPN_HNHV", "(C) RPS_HNHV", "(D) CPS_HNHV"]
 
 base_dir = "/Users/danywaller/Projects/mercury/extreme/magnetopause_3D_timeseries"
 
@@ -35,9 +35,9 @@ for i, case in enumerate(cases):
 
     csv_file = os.path.join(
         base_dir,
-        case,
+        case.split(" ")[1],
         "mp_mesh_analysis",
-        f"{case}_equatorial_standoff_timeseries.csv"
+        f"{case.split(" ")[1]}_equatorial_standoff_timeseries.csv"
     )
 
     df = pd.read_csv(csv_file)
@@ -79,7 +79,7 @@ for i, case in enumerate(cases):
     [bar.set_alpha(0.5) for bar in geo_bars]
     [bar.set_alpha(0.5) for bar in mag_bars]
 
-    ax.set_title(case.replace("_", " "), fontsize=12)
+    ax.set_title(case.replace("_", " "), fontsize=14, fontweight="bold")
     ax.grid(True)
 
 # ============================================================
@@ -87,22 +87,22 @@ for i, case in enumerate(cases):
 # ============================================================
 
 for ax in axes[2:]:
-    ax.set_xlabel("Time (s)")
+    ax.set_xlabel("Time (s)", fontsize=12)
 
 for ax in axes[::2]:
-    ax.set_ylabel("Δr ($R_M$)")
+    ax.set_ylabel("Δr ($R_M$)", fontsize=12)
 
-axes[0].legend()
+for ax in axes:
+    ax.legend(loc="upper right", fontsize=12)
 
 plt.suptitle(
-    "Dayside Magnetopause Standoff Distance\n"
-    "Longitude-Integrated (±75°) Equatorial Timeseries",
-    fontsize=16
+    "Dayside Longitude-Integrated (±75°) Magnetopause Standoff Distance",
+    fontsize=18, fontweight="bold", y=0.975
 )
 
-plt.ylim(1.0, 1.9)
+plt.ylim(1.0, 1.75)
 
-plt.tight_layout(rect=[0,0,1,0.96])
+plt.tight_layout(rect=[0,0,1,0.98])
 
 # ============================================================
 # SAVE FIGURE

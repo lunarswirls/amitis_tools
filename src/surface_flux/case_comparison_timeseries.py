@@ -36,7 +36,8 @@ import src.surface_flux.flux_utils as flux_utils
 # Upstream conditions / ensemble definition
 # =============================================================================
 # Four cases: (R/C)(P)(S/N)_HNHV naming kept as-is from your directory structure.
-cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
+cases = ["RPS_HNHV"]
 
 # Species array is aligned with "sid" index throughout the script.
 # Two proton populations and two alpha populations.
