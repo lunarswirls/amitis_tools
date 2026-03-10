@@ -24,15 +24,15 @@ rmin = 1.0 * RM
 rmax = 1.2 * RM
 
 if "Base" in case:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/object/"
+    input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/cube/"
     output_folder = f"/Users/danywaller/Projects/mercury/extreme/efield_lonlat/{case}/"
     sim_steps = list(range(105000, 115000 + 1, 1000))
 elif "HNHV" in case and not sim_end:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
+    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/cube/"
     output_folder = f"/Users/danywaller/Projects/mercury/extreme/efield_lonlat/{case}/"
     sim_steps = range(115000, 200000 + 1, 1000)
 elif "HNHV" in case and sim_end:
-    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/object/"
+    input_folder = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/cube/"
     output_folder = f"/Users/danywaller/Projects/mercury/extreme/efield_lonlat/{case}_end/"
     sim_steps = range(115000, 350000 + 1, 1000)
 else:
@@ -43,7 +43,7 @@ os.makedirs(output_folder, exist_ok=True)
 
 for step in sim_steps:
 
-    ncfile = os.path.join(input_folder, f"Amitis_{case}_{step}_xz_comp.nc")
+    ncfile = os.path.join(input_folder, f"Amitis_{case}_{step}_merged_4RM.nc")
 
     # ------------------------
     # LOAD E VECTOR
