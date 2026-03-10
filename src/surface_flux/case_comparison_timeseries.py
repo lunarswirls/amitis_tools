@@ -16,7 +16,7 @@ Notes on units
     mass flux:    [kg/m^2/s]
     energy flux:  [W/m^2]
 - compute_flux_statistics(...) in this script is fed number flux in:
-    [#/cm^2/s]  (we multiply by 1e-4 before calling it)
+    [#/cm^2/s]  (multiply by 1e-4 before calling it)
 
 Species-id convention in this run
 ---------------------------------
@@ -36,8 +36,8 @@ import src.surface_flux.flux_utils as flux_utils
 # Upstream conditions / ensemble definition
 # =============================================================================
 # Four cases: (R/C)(P)(S/N)_HNHV naming kept as-is from your directory structure.
-# cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
-cases = ["RPS_HNHV"]
+cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
+# cases = ["RPS_HNHV"]
 
 # Species array is aligned with "sid" index throughout the script.
 # Two proton populations and two alpha populations.
@@ -110,8 +110,11 @@ mass_eps   = 1e-60
 energy_eps = 1e-60
 
 # Statistics keys returned by flux_utils.compute_flux_statistics
-# (We store all of them as time series.)
+# (store all of them as time series)
 stats_keys = [
+    "hemispheric_asymmetry_ratio",
+    "dayside_nightside_ratio",
+    "dawn_dusk_ratio",
     "signed_ratio_day_night",
     "signed_ratio_north_south",
     "signed_ratio_dawn_dusk",
@@ -625,12 +628,12 @@ def save_integrated_timeseries_csv(
 all_cases_ts = {}            # integrated number/mass/energy time series
 all_cases_stats = {}         # statistics computed from TOTAL number-flux maps (cm^-2 s^-1)
 
-# NEW: group-summed statistics computed from *summed number-flux maps*:
+# group-summed statistics computed from *summed number-flux maps*:
 #   - H+ summed (sid00+sid01)
 #   - He++ summed (sid02+sid03)
 #
 # These are computed correctly by recomputing compute_flux_statistics on the summed maps
-# at each timestep (not by summing per-sid stats, which would be wrong for peaks/areas).
+# at each timestep (not by summing per-sid stats, which would be wrong for peaks/areas)
 all_cases_stats_protons = {}
 all_cases_stats_alphas = {}
 
@@ -677,10 +680,8 @@ for case in cases:
 
     # -------------------------------------------------------------------------
     # Statistics time series (derived from number-flux maps, in cm^-2 s^-1)
-    # We keep:
     #   - stats_total_ts: computed from flux_all (total number flux map)
     #   - stats_by_sid_ts: computed from each flux_by_sid[s]
-    # and NEW:
     #   - stats_protons_ts: computed from summed map flux_by_sid[0]+flux_by_sid[1]
     #   - stats_alphas_ts:  computed from summed map flux_by_sid[2]+flux_by_sid[3]
     # -------------------------------------------------------------------------
@@ -764,13 +765,13 @@ for case in cases:
             stats_by_sid_ts[k].append(sid_vals[k])
 
         # ---------------------------------------------------------------------
-        # NEW: Statistics for summed proton and alpha number-flux maps
+        # Statistics for summed proton and alpha number-flux maps
         #
         # This is the correct way to get:
         #   - peak_flux_value of (sid00+sid01) or (sid02+sid03)
         #   - spatial_extent_percentage of the summed map
         #
-        # (Summing per-sid peaks/areas is not equivalent to recomputing stats on the sum.)
+        # (Summing per-sid peaks/areas is not equivalent to recomputing stats on the sum)
         # ---------------------------------------------------------------------
         nf_protons = flux_utils.nan_safe_sum2(flux_by_sid[PROTON_SIDS[0]], flux_by_sid[PROTON_SIDS[1]])
         nf_alphas  = flux_utils.nan_safe_sum2(flux_by_sid[ALPHA_SIDS[0]],  flux_by_sid[ALPHA_SIDS[1]])
@@ -857,7 +858,7 @@ for case in cases:
                     lon_bin_edges,
                     lat_bin_edges,
                     flux_by_sid[s],
-                    title=f"{case.replace('_',' ')} {species[s]} ({s}) inward surface number flux, t={t:.3f} s",
+                    title=f"{case.replace('_',' ')} {species[s]} ({s}) number flux, t={t:.3f} s",
                     plot_log10=True,
                     eps=eps,
                     cmap=CMAP,
@@ -873,7 +874,7 @@ for case in cases:
                     lon_bin_edges,
                     lat_bin_edges,
                     mass_flux_by_sid[s],
-                    title=f"{case.replace('_',' ')} {species[s]} ({s}) inward surface mass flux, t={t:.3f} s",
+                    title=f"{case.replace('_',' ')} {species[s]} ({s}) mass flux, t={t:.3f} s",
                     plot_log10=True,
                     eps=mass_eps,
                     cmap="magma",
@@ -889,7 +890,7 @@ for case in cases:
                     lon_bin_edges,
                     lat_bin_edges,
                     energy_flux_by_sid[s],
-                    title=f"{case.replace('_',' ')} {species[s]} ({s}) inward surface energy flux, t={t:.3f} s",
+                    title=f"{case.replace('_',' ')} {species[s]} ({s}) energy flux, t={t:.3f} s",
                     plot_log10=True,
                     eps=energy_eps,
                     cmap="plasma",
@@ -900,7 +901,7 @@ for case in cases:
 
         # ---------------------------------------------------------------------
         # Per-timestep *summed* H+ and He++ maps (number/mass/energy)
-        # (These are *maps*, not the stats plots.)
+        # These are *maps*, not the stats plots
         # ---------------------------------------------------------------------
         combos = [
             (
@@ -932,7 +933,7 @@ for case in cases:
                 lon_bin_edges,
                 lat_bin_edges,
                 nf_combo,
-                title=f"{case.replace('_',' ')} {combo_label} surface number flux, t={t:.3f} s",
+                title=f"{case.replace('_',' ')} {combo_label} number flux, t={t:.3f} s",
                 plot_log10=True,
                 eps=eps,
                 cmap=CMAP,
@@ -947,7 +948,7 @@ for case in cases:
                 lon_bin_edges,
                 lat_bin_edges,
                 mf_combo,
-                title=f"{case.replace('_',' ')} {combo_label} surface mass flux, t={t:.3f} s",
+                title=f"{case.replace('_',' ')} {combo_label} mass flux, t={t:.3f} s",
                 plot_log10=True,
                 eps=mass_eps,
                 cmap="magma",
@@ -962,7 +963,7 @@ for case in cases:
                 lon_bin_edges,
                 lat_bin_edges,
                 ef_combo,
-                title=f"{case.replace('_',' ')} {combo_label} surface energy flux, t={t:.3f} s",
+                title=f"{case.replace('_',' ')} {combo_label} energy flux, t={t:.3f} s",
                 plot_log10=True,
                 eps=energy_eps,
                 cmap="plasma",
@@ -1130,7 +1131,7 @@ for case in cases:
         species=species,
     )
 
-    # NEW: group-summed map stats
+    # group-summed map stats
     all_cases_stats_protons[case] = dict(
         times=times,
         stats_total_ts=stats_protons_ts,   # stats computed on (sid00+sid01) number-flux map
@@ -1225,6 +1226,21 @@ save_stats_triptych_multicases(
     show_per_sid=False,
     suptitle="All cases – hemispheric / day-night / dawn-dusk asymmetry (total flux)",
     ylim=[-1.05, 1.05],
+)
+
+# unsigned ratios
+stats2_triptych_def = [
+    ("hemispheric_asymmetry_ratio", "North/South precipitation ratio", "North/South"),
+    ("dayside_nightside_ratio",   "Day/Night precipitation ratio",   "Day/Night"),
+    ("dawn_dusk_ratio",   "Dawn/Dusk precipitation ratio",   "(Dawn-Dusk)/(Dawn+Dusk)"),
+]
+
+save_stats_triptych_multicases(
+    os.path.join(multi_out, "all_cases_stats_hemi_daynight_dawndusk_raw_total.png"),
+    all_cases_stats,
+    stats2_triptych_def,
+    show_per_sid=False,
+    suptitle="All cases – north-south / day-night / dawn-dusk asymmetry (total flux)",
 )
 
 # Peak-related two-panel definition (used for total, and now also for H+ and He++ summed maps)
