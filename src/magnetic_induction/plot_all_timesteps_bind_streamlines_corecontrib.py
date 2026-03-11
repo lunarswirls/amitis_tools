@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 # SETTINGS
 # --------------------------
 branch = "HNHV"
-case = "PS"
-steps = [115000, 142000, 174000, 350000]
+case = "PN"
+steps = [115000, 135000, 165000, 350000]
 case_r = f"R{case}"
 case_c = f"C{case}"
 

@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 import numpy as np
 
-case = "RPS"
+case = "CPN"
 mode = "HNHV"
-sim_steps = list(range(220000, 275000 + 1, 1000))
+sim_steps = list(range(275000, 300000 + 1, 1000))
 # sim_steps = list(range(193000, 350000 + 1, 1000))
 # sim_steps = list(range(325000, 339000 + 1, 1000))
 dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
@@ -30,9 +30,9 @@ def build_file_path(pfix: str) -> list:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/04/subset/"
     elif 195000 <= sstep <= 220000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/05/subset/"
-    elif 220000 < sstep <= 245000:
+    elif 225000 <= sstep <= 250000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/06/subset/"
-    elif 245000 < sstep <= 275000:
+    elif 250000 < sstep <= 275000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/07/subset/"
     elif 275000 < sstep <= 300000:
         input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/08/subset/"

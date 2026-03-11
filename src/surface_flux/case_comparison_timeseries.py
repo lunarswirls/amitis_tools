@@ -35,21 +35,21 @@ import src.surface_flux.flux_utils as flux_utils
 # =============================================================================
 # Upstream conditions / ensemble definition
 # =============================================================================
-# Four cases: (R/C)(P)(S/N)_HNHV naming kept as-is from your directory structure.
-cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
-# cases = ["RPS_HNHV"]
+# Four cases: (R/C)(P)(S/N)_HNHV
+# cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
+cases = ["CPN_HNHV"]
 
-# Species array is aligned with "sid" index throughout the script.
-# Two proton populations and two alpha populations.
+# Species array must align with "sid" index
+# Two proton populations and two alpha populations
 species = np.array(["H+", "H+", "He++", "He++"])
 
-# Simulation macro-particles per cell, upstream densities, and velocities, by sid.
-# These are used to compute macro-particle weights for mapping counts → physical flux.
+# Simulation macro-particles per cell, upstream densities, and velocities, by sid
+# These are used to compute macro-particle weights for mapping counts → physical flux
 sim_ppc = np.array([24, 24, 11, 11], dtype=float)
 sim_den = np.array([38.0e6, 76.0e6, 1.0e6, 2.0e6], dtype=float)   # [m^-3]
 sim_vel = np.array([400.0e3, 700.0e3, 400.0e3, 700.0e3], dtype=float)  # [m/s]
 
-# Particle mass / charge per species id (sid).
+# Particle mass / charge per species id (sid)
 species_mass = np.array([1.0, 1.0, 4.0, 4.0], dtype=float)   # [amu]
 species_charge = np.array([1.0, 1.0, 2.0, 2.0], dtype=float) # [e]
 

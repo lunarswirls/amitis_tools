@@ -30,10 +30,10 @@ import matplotlib.colors as mcolors
 # USER SETTINGS
 # =============================================================================
 cases = ["RPS_HNHV", "CPS_HNHV", "RPN_HNHV", "CPN_HNHV"]
-selected_times = [230, 284, 348, 700]  # s
+selected_times = [230, 270, 330, 700]  # s
 
-base_precip_dir = "/Volumes/T9/mercury/extreme/High_HNHV"
-base_mp_dir = "/Volumes/T9/mercury/magnetopause_3D_timeseries"
+base_precip_dir = "/Volumes/data_backup/mercury/extreme/High_HNHV"
+base_mp_dir = "/Users/danywaller/Projects/mercury/extreme/magnetopause_3D_timeseries"
 
 out_dir = "/Users/danywaller/Projects/mercury/extreme/gridded_dr_flux"
 os.makedirs(out_dir, exist_ok=True)

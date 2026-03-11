@@ -14,20 +14,21 @@ import scipy.sparse.linalg as spla
 # --------------------------
 debug = False
 branch = "HNHV"
-case = "PS"     # 115000 (pre) or 142000 (transient) or 174000 (post) or 350000 (new)
-steps = [115000, 142000, 174000, 350000]
+case = "PN"     # 115000 (pre) or 135000 (transient) or 165000 (post) or 350000 (new)
+# steps = [115000, 135000, 165000, 350000]
+steps = [135000, 165000]
 
 case_r = f"R{case}"
 case_c = f"C{case}"
 
 for step in steps:
     if "HN" in branch:
-        input_folder_r = f"/Volumes/T9/mercury/extreme/High_HNHV/{case_r}_HNHV/plane_product/cube/"
+        input_folder_r = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case_r}_HNHV/plane_product/cube/"
         input_folder_c = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case_c}_HNHV/plane_product/cube/"
         ncfile_r = os.path.join(input_folder_r, f"Amitis_{case_r}_HNHV_{step}_merged_4RM.nc")
         ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_HNHV_{step}_merged_4RM.nc")
     else:
-        input_folder_r = f"/Volumes/T9/mercury/extreme/{case_r}_Base/plane_product/cube/"
+        input_folder_r = f"/Volumes/data_backup/mercury/extreme/{case_r}_Base/plane_product/cube/"
         input_folder_c = f"/Volumes/data_backup/mercury/extreme/High_Base/{case_c}_Base/plane_product/cube/"
         ncfile_r = os.path.join(input_folder_r, f"Amitis_{case_r}_Base_{step}_merged_4RM.nc")
         ncfile_c = os.path.join(input_folder_c, f"Amitis_{case_c}_Base_{step}_merged_4RM.nc")
