@@ -37,7 +37,7 @@ import src.surface_flux.flux_utils as flux_utils
 # =============================================================================
 # Four cases: (R/C)(P)(S/N)_HNHV
 # cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
-cases = ["CPN_HNHV"]
+cases = ["RPN_HNHV"]
 
 # Species array must align with "sid" index
 # Two proton populations and two alpha populations

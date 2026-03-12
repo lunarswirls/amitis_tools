@@ -16,10 +16,10 @@ cases = [
 ]
 
 case_styles = {
-    "RPS_HNHV": dict(color="cornflowerblue", ls="-"),
-    "CPS_HNHV": dict(color="darkorange",    ls="-"),
-    "RPN_HNHV": dict(color="mediumorchid",  ls="-"),
-    "CPN_HNHV": dict(color="hotpink",       ls="-"),
+    "RPN_HNHV": dict(color="forestgreen", ls="-"),
+    "CPN_HNHV": dict(color="cornflowerblue",    ls="-"),
+    "RPS_HNHV": dict(color="darkorchid",  ls="-"),
+    "CPS_HNHV": dict(color="hotpink",       ls="-"),
 }
 
 # ---------------------------------------------------------
@@ -92,7 +92,7 @@ ylabels = [
 # -------------------------------------------------
 # total stats figure
 # -------------------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(8, 8), sharex=True)
+fig, axes = plt.subplots(2, 2, figsize=(9, 8), sharex=True)
 axes = axes.flatten()
 
 axes = axes.flatten()
@@ -116,14 +116,10 @@ for case, df in total_stats.items():
         if case not in lines:
             lines[case] = line
 
-# -------------------------------------------------
 # Axis formatting
-# -------------------------------------------------
-
 for i, ax in enumerate(axes):
 
     ax.set_title(titles[i], fontweight="bold")
-
     ax.set_ylabel(ylabels[i])
     ax.grid(alpha=0.3)
 
@@ -147,10 +143,17 @@ for i, ax in enumerate(axes):
         ax.set_ylim([-0.5, 40.0])
         ax.set_xlabel("Time (s)")
 
-# -------------------------------------------------
-# Global legend (bottom)
-# -------------------------------------------------
+    # --- Add black dotted vertical lines ---
+    for x in [240, 360]:
+        ax.axvline(x, color='k', linestyle='--', linewidth=1.0)
+        # Add '*' at the top of the line
+        ylim = ax.get_ylim()
+        ax.text(
+            x+0.015*x, ylim[1]-0.07*ylim[1], '*', color='k', fontsize=14,
+            ha='left', va='bottom', fontweight='bold'
+        )
 
+# Global legend (bottom)
 handles = []
 labels_legend = []
 
@@ -210,16 +213,16 @@ for case, df in proton_stats.items():
         if case not in lines:
             lines[case] = line
 
-# -------------------------------------------------
 # Axis formatting
-# -------------------------------------------------
-
 for i, ax in enumerate(axes):
 
-    ax.set_title(titles[i])
-    ax.set_xlabel("Time (s)")
+    ax.set_title(titles[i], fontweight="bold")
     ax.set_ylabel(ylabels[i])
     ax.grid(alpha=0.3)
+
+    # --- Add black dotted vertical lines ---
+    ax.axvline(240, color='k', linestyle='--', linewidth=1.0)
+    ax.axvline(360, color='k', linestyle='--', linewidth=1.0)
 
     if variables[i] == "peak_flux_value":
         ax.set_yscale("log")
@@ -234,10 +237,12 @@ for i, ax in enumerate(axes):
         ax.set_ylim([0.0, 50.0])
 
     if variables[i] == "dawn_dusk_ratio":
-        ax.set_ylim([0.5, 5.0])
+        ax.set_ylim([0.25, 2.25])
+        ax.set_xlabel("Time (s)")
 
     if variables[i] == "spatial_extent_percentage":
         ax.set_ylim([-0.5, 40.0])
+        ax.set_xlabel("Time (s)")
 
 # Global legend (bottom)
 handles = []
@@ -271,7 +276,7 @@ plt.show()
 # -------------------------------------------------
 # alpha stats figure
 # -------------------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(9, 9), sharex=True)
+fig, axes = plt.subplots(2, 2, figsize=(9, 8), sharex=True)
 
 axes = axes.flatten()
 
@@ -355,7 +360,7 @@ plt.show()
 # -------------------------------------------------
 # total stats figure - zoom on transient
 # -------------------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(9, 9), sharex=True)
+fig, axes = plt.subplots(2, 2, figsize=(9, 8), sharex=True)
 
 axes = axes.flatten()
 
@@ -381,12 +386,12 @@ for case, df in total_stats.items():
 # Axis formatting
 for i, ax in enumerate(axes):
 
-    ax.set_title(titles[i])
-    ax.set_xlabel("Time (s)")
+    zoom_title = titles[i].replace(")", "*)")
+    ax.set_title(zoom_title, fontweight="bold")
     ax.set_ylabel(ylabels[i])
     ax.grid(alpha=0.3)
 
-    ax.set_xlim([250, 350])
+    ax.set_xlim([240, 360])
 
     if variables[i] == "peak_flux_value":
         ax.set_yscale("log")
@@ -401,12 +406,14 @@ for i, ax in enumerate(axes):
         ax.set_ylim([0.0, 50.0])
 
     if variables[i] == "dawn_dusk_ratio":
-        ax.set_ylim([0.5, 5.0])
+        ax.set_ylim([0.25, 2.25])
+        ax.set_xlabel("Time (s)")
 
     if variables[i] == "spatial_extent_percentage":
         ax.set_ylim([-0.5, 40.0])
+        ax.set_xlabel("Time (s)")
 
-# Global legend (bottom)
+# global legends
 handles = []
 labels_legend = []
 
@@ -415,7 +422,7 @@ for case in case_styles.keys():
     handles.append(lines[case])
     labels_legend.append(case.split("_")[0])
 
-fig.legend(
+leg = fig.legend(
     handles,
     labels_legend,
     loc="lower center",
@@ -423,11 +430,15 @@ fig.legend(
     fontsize=12,
     bbox_to_anchor=(0.5, 0.01)
 )
+leg_lines = leg.get_lines()
+leg_texts = leg.get_texts()
+# bulk-set the properties of all lines and texts
+plt.setp(leg_lines, linewidth=2.5)
 
 fig.align_ylabels()
 
 # Save / show
-plt.suptitle("Total precipitation statistics vs time (Transient)", fontsize=16, fontweight="bold")
+plt.suptitle("Transient Zoom", fontsize=16, fontweight="bold", y=0.99)
 
 plt.tight_layout(rect=[0, 0.05, 1, 1])
 out_png = os.path.join(base_dir, "all_cases_total_precip_stats_transient_zoom.png")
