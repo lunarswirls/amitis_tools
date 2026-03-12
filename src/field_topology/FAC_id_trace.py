@@ -11,11 +11,12 @@ from src.field_topology.topology_utils import trace_field_line_rk_shell
 # --------------------------
 # USER SETTINGS
 # --------------------------
-case = "RPS_Base"
-step = 115000
+case = "RPN"  # RPN CPN RPS CPS
+mode = "HNHV"  # Base or HNHV
+step = int(270/0.002)  # selected_times = [230, 270, 330, 700]
 
-input_folder = f"/Volumes/data_backup/mercury/extreme/{case}/plane_product/cube/"
-ncfile = os.path.join(input_folder, f"Amitis_{case}_{step:06d}_merged_4RM.nc")
+input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/cube/"
+ncfile = os.path.join(input_folder, f"Amitis_{case}_{mode}_{step:06d}_merged_4RM.nc")
 
 output_folder = f"/Users/danywaller/Projects/mercury/extreme/FAC_detection/{case}/"
 os.makedirs(output_folder, exist_ok=True)

@@ -11,7 +11,7 @@ from plotly.subplots import make_subplots
 # --------------------------
 # SETTINGS
 # --------------------------
-case = "CPN"
+case = "CPS"
 mode = "HNHV"
 sim_steps = list(range(105000, 350000 + 1, 1000))
 
@@ -44,10 +44,10 @@ step_to_seconds = 0.002
 def build_file_path(sim_step: int) -> str:
     if sim_step <= 115000:
         fmode = "Base"
-        input_folder = f"/Volumes/T9/mercury/extreme/{case}_Base/plane_product/cube/"
+        input_folder = f"/Volumes/data_backup/mercury/extreme/High_Base/{case}_Base/plane_product/cube/"
     else:
         fmode = "HNHV"
-        input_folder = f"/Volumes/T9/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/cube/"
+        input_folder = f"/Volumes/data_backup/mercury/extreme/High_{mode}/{case}_{mode}/plane_product/cube/"
     return os.path.join(input_folder, f"Amitis_{case}_{fmode}_{sim_step:06d}_merged_4RM.nc")
 
 
