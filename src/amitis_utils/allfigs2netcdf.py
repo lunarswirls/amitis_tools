@@ -6,7 +6,7 @@ import os
 
 # cases = ["RPN_HNHV", "CPN_HNHV", "CPS_HNHV", "RPS_HNHV"]
 # cases = ["RPN_Base", "RPS_Base", "CPN_Base", "CPS_Base"]
-cases = ["CPS_HNHV"]
+cases = ["RPS_Base"]
 
 for case in cases:
     try:
@@ -23,9 +23,9 @@ for case in cases:
         ]
 
         if "Base" in case:
-            base_path = f"/Volumes/T9/mercury/extreme/{case}/plane_product/"
-            output_path = f"/Volumes/T9/mercury/extreme/{case}/plane_product/cube/"
-            simsteps = list(range(85000, 104000 + 1, 1000))
+            base_path = f"/Volumes/data_backup/mercury/extreme/High_Base/{case}/plane_product/"
+            output_path = f"/Volumes/data_backup/mercury/extreme/High_Base/{case}/plane_product/cube/"
+            simsteps = list(range(105000, 115000 + 1, 1000))
         elif "HNHV" in case:
             base_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/"
             output_path = f"/Volumes/data_backup/mercury/extreme/High_HNHV/{case}/plane_product/cube/"

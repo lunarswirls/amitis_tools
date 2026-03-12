@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 import numpy as np
 
-case = "CPN"
+case = "RPN"
 mode = "HNHV"
-sim_steps = list(range(275000, 300000 + 1, 1000))
+sim_steps = list(range(250000, 276000 + 1, 1000))
 # sim_steps = list(range(193000, 350000 + 1, 1000))
 # sim_steps = list(range(325000, 339000 + 1, 1000))
 dt = 0.002  # simulation dt defined in Amitis.inp [seconds]
