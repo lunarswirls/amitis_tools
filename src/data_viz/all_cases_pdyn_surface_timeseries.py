@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 cases = ["RPN_HNHV", "CPN_HNHV", "RPS_HNHV", "CPS_HNHV"]
 labels = ["RPN", "CPN", "RPS", "CPS"]
 
-colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+colors = ["firebrick", "darkorange", "goldenrod", "royalblue"]
 
 selected_times = [230, 270, 330, 700]
 
@@ -160,6 +160,27 @@ for i, sim_step in enumerate(sim_steps):
 for case in cases:
     surface_timeseries[case] = np.array(surface_timeseries[case])
 
+import pandas as pd
+
+# -------------------------------
+# Save timeseries to CSV
+# -------------------------------
+
+# build dataframe
+data = {"time_s": timestamps}
+
+for case in cases:
+    data[case] = surface_timeseries[case]
+
+df = pd.DataFrame(data)
+
+# output file
+csv_file = os.path.join(output_folder, "surface_pdyn_timeseries_all_cases.csv")
+
+df.to_csv(csv_file, index=False)
+
+print("\nSaved CSV:", csv_file)
+
 # -------------------------------
 # Plot
 # -------------------------------
@@ -176,21 +197,26 @@ for case, label, color in zip(cases, labels, colors):
         color=color
     )
 
+i = 1
 # vertical lines
 for t in selected_times:
     ax.axvline(
-        t,
+        float(t),
         linestyle="--",
         color="black",
         alpha=0.7
     )
+    # Add string at the top of the line
+    ylim = ax.get_ylim()
+    ax.text(float(t), ylim[1], f'({i})', color='k', fontsize=14, ha='left', va='bottom', fontweight='bold')
+    i+=1
 
 ax.set_xlabel("Time [s]", fontsize=14)
 ax.set_ylabel(r"P$_{dyn}$ [nPa]", fontsize=14)
 
-ax.grid(True, linestyle="--", alpha=0.3)
+ax.grid(True, linestyle="-", alpha=0.3)
 
-ax.legend()
+ax.legend(ncol=2)
 
 plt.title("Surface Dynamic Pressure")
 

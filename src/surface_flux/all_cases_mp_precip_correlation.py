@@ -55,6 +55,7 @@ lat_centers = 0.5 * (lat_bin_edges[:-1] + lat_bin_edges[1:])
 lon_centers = 0.5 * (lon_bin_edges[:-1] + lon_bin_edges[1:])
 
 DAY_LON_MIN, DAY_LON_MAX = -75, 75  # dayside longitude for correlation
+DAY_LAT_MIN, DAY_LAT_MAX = -90, 90
 
 V_cell = sim_dx * sim_dy * sim_dz
 W_by_sid = flux_utils.macro_weights(sim_den, sim_ppc, V_cell)
@@ -203,7 +204,7 @@ def _compute_dayside_delta_r_map(mask_xyz, ray_cache):
     r_map = np.full(out_shape, np.nan)
     r_map[any_true] = r_samp[j_first[any_true]]
 
-    delta_r = r_map - 1.0
+    delta_r = r_map  # - 1.0
 
     # Fill NaNs and smooth
     if FILL_NAN_WITH_NEAREST:
@@ -276,214 +277,216 @@ for case in cases:
 # =============================================================================
 # PLOT CORRELATION HEATMAP (4x4 style: times × cases)
 # =============================================================================
-n_rows, n_cols = len(selected_times), len(cases)
-fig, axes = plt.subplots(
-    n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows),
-    squeeze=False, sharex=True, sharey=True, constrained_layout=True
-)
+if 0:
+    n_rows, n_cols = len(selected_times), len(cases)
+    fig, axes = plt.subplots(
+        n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows),
+        squeeze=False, sharex=True, sharey=True, constrained_layout=True
+    )
 
-for col, case in enumerate(cases):
-    for row, t_sel in enumerate(selected_times):
-        ax = axes[row, col]
-        dr = all_delta_r[case][t_sel].flatten()
-        flux_log = np.log10(all_flux[case][t_sel].flatten())
+    for col, case in enumerate(cases):
+        for row, t_sel in enumerate(selected_times):
+            ax = axes[row, col]
+            dr = all_delta_r[case][t_sel].flatten()
+            flux_log = np.log10(all_flux[case][t_sel].flatten())
 
-        valid = np.isfinite(dr) & np.isfinite(flux_log) & (flux_log > 0)
-        dr, flux_log = dr[valid], flux_log[valid]
+            valid = np.isfinite(dr) & np.isfinite(flux_log) & (flux_log > 0)
+            dr, flux_log = dr[valid], flux_log[valid]
 
-        # 2D histogram
-        h = ax.hist2d(
-            dr, flux_log,
-            bins=[DR_BINS, 80],
-            cmap="cividis",
-            range=[[0.03, 1.03], [8, 14]],
-            vmin=0, vmax=5   # <-- fixed colormap limits
-        )
+            # 2D histogram
+            h = ax.hist2d(
+                dr, flux_log,
+                bins=[DR_BINS, 80],
+                cmap="cividis",
+                range=[[1.0, 1.9], [8, 14]],
+                vmin=0, vmax=5   # <-- fixed colormap limits
+            )
 
-        # median trend
-        bins = np.linspace(0.03, 1.03, DR_BINS)
-        digitized = np.digitize(dr, bins)
-        med = [np.nanmedian(flux_log[digitized == i]) for i in range(1, len(bins))]
-        centers = 0.5 * (bins[:-1] + bins[1:])
-        # ax.plot(centers, med, color="red", lw=2, label="median")
+            # median trend
+            bins = np.linspace(1.0, 1.9, DR_BINS)
+            digitized = np.digitize(dr, bins)
+            med = [np.nanmedian(flux_log[digitized == i]) for i in range(1, len(bins))]
+            centers = 0.5 * (bins[:-1] + bins[1:])
+            # ax.plot(centers, med, color="red", lw=2, label="median")
 
-        ax.set_title(f"{case} t={t_sel:.1f} s", fontsize=10)
-        ax.set_xlim(0.03, 1.03)
-        ax.set_ylim(8, 14)
-        if row == n_rows - 1: ax.set_xlabel("Δr [R_M]")
-        if col == 0: ax.set_ylabel("log10 flux")
-        ax.grid(alpha=0.3)
+            ax.set_title(f"{case} t={t_sel:.1f} s", fontsize=10)
+            ax.set_xlim(1.0, 1.9)
+            ax.set_ylim(8, 14)
+            if row == n_rows - 1: ax.set_xlabel("Δr [R_M]")
+            if col == 0: ax.set_ylabel("log10 flux")
+            ax.grid(alpha=0.3)
 
-fig.colorbar(
-    h[3], ax=axes, orientation="vertical",
-    fraction=0.02, pad=0.01, label="counts",
-    ticks=np.linspace(0, 5, 6)  # fixed tick labels
-)
-plt.show()
+    fig.colorbar(
+        h[3], ax=axes, orientation="vertical",
+        fraction=0.02, pad=0.01, label="counts",
+        ticks=np.linspace(0, 5, 6)  # fixed tick labels
+    )
+    plt.show()
 
 # =============================================================================
 # PLOT DAYSIDE Δr AND PRECIPITATION ON HAMMER PROJECTION (per case)
 # =============================================================================
-
-# raw hammer plots
-for case in cases:
-    fig, axes = plt.subplots(
-        nrows=4, ncols=2, figsize=(12, 12), constrained_layout=True,
-        subplot_kw={'projection': 'hammer'}
-    )
-
-    for row, t_sel in enumerate(selected_times):
-        ax_dr = axes[row, 0]
-        ax_flux = axes[row, 1]
-
-        dr = all_delta_r[case][t_sel]
-        flux = all_flux[case][t_sel]
-
-        # lat/lon in radians for plotting
-        lat_rad = np.radians(lat_centers)
-        lon_rad = np.radians(lon_centers[(lon_centers >= DAY_LON_MIN) & (lon_centers <= DAY_LON_MAX)])
-
-        # build edge arrays for pcolormesh
-        lat_edges = np.radians(np.linspace(-90, 90, dr.shape[0] + 1))
-        lon_edges = np.radians(np.linspace(DAY_LON_MIN, DAY_LON_MAX, dr.shape[1] + 1))
-
-        # Plot Δr
-        pcm = ax_dr.pcolormesh(
-            lon_edges, lat_edges, dr,
-            shading='auto', cmap='viridis', vmin=0.0, vmax=0.75
+if 0:
+    # raw hammer plots
+    for case in cases:
+        fig, axes = plt.subplots(
+            nrows=4, ncols=2, figsize=(12, 12), constrained_layout=True,
+            subplot_kw={'projection': 'hammer'}
         )
-        ax_dr.set_title(f"{case.split("_")[0]} Δr t={t_sel:.1f}s")
-        ax_dr.set_xticks(np.radians(np.linspace(-120, 120, 7)))  # 7 ticks from -120° to +120°
-        ax_dr.set_yticks(np.radians(np.linspace(-60, 60, 7)))  # 7 ticks from -60° to +60°
-        ax_dr.grid(alpha=0.3)
 
-        # Plot precipitation flux
-        pcm_f = ax_flux.pcolormesh(
-            lon_edges, lat_edges, flux,
-            shading='auto', cmap='plasma', norm=mcolors.LogNorm(vmin=1e8, vmax=1e14)
+        for row, t_sel in enumerate(selected_times):
+            ax_dr = axes[row, 0]
+            ax_flux = axes[row, 1]
+
+            dr = all_delta_r[case][t_sel]
+            flux = all_flux[case][t_sel]
+
+            # lat/lon in radians for plotting
+            lat_rad = np.radians(lat_centers)
+            lon_rad = np.radians(lon_centers[(lon_centers >= DAY_LON_MIN) & (lon_centers <= DAY_LON_MAX)])
+
+            # build edge arrays for pcolormesh
+            lat_edges = np.radians(np.linspace(-90, 90, dr.shape[0] + 1))
+            lon_edges = np.radians(np.linspace(DAY_LON_MIN, DAY_LON_MAX, dr.shape[1] + 1))
+
+            # Plot Δr
+            pcm = ax_dr.pcolormesh(
+                lon_edges, lat_edges, dr,
+                shading='auto', cmap='viridis', vmin=1.0, vmax=1.75
+            )
+            ax_dr.set_title(f"{case.split("_")[0]} Δr t={t_sel:.1f}s")
+            ax_dr.set_xticks(np.radians(np.linspace(-120, 120, 7)))  # 7 ticks from -120° to +120°
+            ax_dr.set_yticks(np.radians(np.linspace(-60, 60, 7)))  # 7 ticks from -60° to +60°
+            ax_dr.grid(alpha=0.3)
+
+            # Plot precipitation flux
+            pcm_f = ax_flux.pcolormesh(
+                lon_edges, lat_edges, flux,
+                shading='auto', cmap='plasma', norm=mcolors.LogNorm(vmin=1e8, vmax=1e14)
+            )
+            ax_flux.set_title(f"{case.split("_")[0]} flux t={t_sel:.1f}s")
+            ax_flux.set_xticks(np.radians(np.linspace(-120, 120, 7)))  # 7 ticks from -120° to +120°
+            ax_flux.set_yticks(np.radians(np.linspace(-60, 60, 7)))  # 7 ticks from -60° to +60°
+            ax_flux.grid(alpha=0.3)
+
+        fig.colorbar(pcm, ax=axes[:, 0], orientation='horizontal', fraction=0.05, pad=0.02, label='Δr [R_M]')
+        fig.colorbar(pcm_f, ax=axes[:, 1], orientation='horizontal', fraction=0.05, pad=0.02, label='Flux [#/m²/s]')
+        out_png = os.path.join(out_dir, f"{case}_delta_r_flux_gridded_raw.png")
+        fig.savefig(out_png, dpi=250)
+        plt.show()
+
+
+    # log hammer plots
+    for case in cases:
+        fig, axes = plt.subplots(
+            nrows=4, ncols=2, figsize=(12, 12), constrained_layout=True,
+            subplot_kw={'projection': 'hammer'}
         )
-        ax_flux.set_title(f"{case.split("_")[0]} flux t={t_sel:.1f}s")
-        ax_flux.set_xticks(np.radians(np.linspace(-120, 120, 7)))  # 7 ticks from -120° to +120°
-        ax_flux.set_yticks(np.radians(np.linspace(-60, 60, 7)))  # 7 ticks from -60° to +60°
-        ax_flux.grid(alpha=0.3)
 
-    fig.colorbar(pcm, ax=axes[:, 0], orientation='horizontal', fraction=0.05, pad=0.02, label='Δr [R_M]')
-    fig.colorbar(pcm_f, ax=axes[:, 1], orientation='horizontal', fraction=0.05, pad=0.02, label='Flux [#/m²/s]')
-    out_png = os.path.join(out_dir, f"{case}_delta_r_flux_gridded_raw.png")
-    fig.savefig(out_png, dpi=250)
-    plt.show()
+        for row, t_sel in enumerate(selected_times):
+            ax_dr = axes[row, 0]
+            ax_flux = axes[row, 1]
 
+            dr = np.log10(all_delta_r[case][t_sel])
+            flux = np.log10(all_flux[case][t_sel])
 
-# log hammer plots
-for case in cases:
-    fig, axes = plt.subplots(
-        nrows=4, ncols=2, figsize=(12, 12), constrained_layout=True,
-        subplot_kw={'projection': 'hammer'}
-    )
+            # lat/lon in radians for plotting
+            lat_rad = np.radians(lat_centers)
+            lon_rad = np.radians(lon_centers[(lon_centers >= DAY_LON_MIN) & (lon_centers <= DAY_LON_MAX)])
 
-    for row, t_sel in enumerate(selected_times):
-        ax_dr = axes[row, 0]
-        ax_flux = axes[row, 1]
+            # build edge arrays for pcolormesh
+            lat_edges = np.radians(np.linspace(-90, 90, dr.shape[0] + 1))
+            lon_edges = np.radians(np.linspace(DAY_LON_MIN, DAY_LON_MAX, dr.shape[1] + 1))
 
-        dr = np.log10(all_delta_r[case][t_sel])
-        flux = np.log10(all_flux[case][t_sel])
+            # Plot Δr
+            pcm = ax_dr.pcolormesh(
+                lon_edges, lat_edges, dr,
+                shading='auto', cmap='viridis', vmin=np.log10(1.0), vmax=np.log10(1.75)
+            )
+            ax_dr.set_title(f"{case.split("_")[0]} log10(Δr) t={t_sel:.1f}s")
+            ax_dr.set_xticks(np.radians(np.linspace(-120, 120, 7)))
+            ax_dr.set_yticks(np.radians(np.linspace(-60, 60, 7)))
+            ax_dr.grid(alpha=0.3)
 
-        # lat/lon in radians for plotting
-        lat_rad = np.radians(lat_centers)
-        lon_rad = np.radians(lon_centers[(lon_centers >= DAY_LON_MIN) & (lon_centers <= DAY_LON_MAX)])
+            # Plot precipitation flux
+            pcm_f = ax_flux.pcolormesh(
+                lon_edges, lat_edges, flux,
+                shading='auto', cmap='plasma', vmin=np.log10(1e8), vmax=np.log10(1e14)
+            )
+            ax_flux.set_title(f"{case.split("_")[0]} log10(flux) t={t_sel:.1f}s")
+            ax_flux.set_xticks(np.radians(np.linspace(-120, 120, 7)))
+            ax_flux.set_yticks(np.radians(np.linspace(-60, 60, 7)))
+            ax_flux.grid(alpha=0.3)
 
-        # build edge arrays for pcolormesh
-        lat_edges = np.radians(np.linspace(-90, 90, dr.shape[0] + 1))
-        lon_edges = np.radians(np.linspace(DAY_LON_MIN, DAY_LON_MAX, dr.shape[1] + 1))
-
-        # Plot Δr
-        pcm = ax_dr.pcolormesh(
-            lon_edges, lat_edges, dr,
-            shading='auto', cmap='viridis', vmin=np.log10(0.01), vmax=np.log10(0.75)
-        )
-        ax_dr.set_title(f"{case.split("_")[0]} log10(Δr) t={t_sel:.1f}s")
-        ax_dr.set_xticks(np.radians(np.linspace(-120, 120, 7)))
-        ax_dr.set_yticks(np.radians(np.linspace(-60, 60, 7)))
-        ax_dr.grid(alpha=0.3)
-
-        # Plot precipitation flux
-        pcm_f = ax_flux.pcolormesh(
-            lon_edges, lat_edges, flux,
-            shading='auto', cmap='plasma', vmin=np.log10(1e8), vmax=np.log10(1e14)
-        )
-        ax_flux.set_title(f"{case.split("_")[0]} log10(flux) t={t_sel:.1f}s")
-        ax_flux.set_xticks(np.radians(np.linspace(-120, 120, 7)))
-        ax_flux.set_yticks(np.radians(np.linspace(-60, 60, 7)))
-        ax_flux.grid(alpha=0.3)
-
-    fig.colorbar(pcm, ax=axes[:, 0], orientation='horizontal', fraction=0.05, pad=0.02, label='log10(Δr [R_M])')
-    fig.colorbar(pcm_f, ax=axes[:, 1], orientation='horizontal', fraction=0.05, pad=0.02, label='log10(Flux [#/m²/s])')
-    out_png = os.path.join(out_dir, f"{case}_delta_r_flux_gridded_log.png")
-    fig.savefig(out_png, dpi=250)
-    plt.show()
+        fig.colorbar(pcm, ax=axes[:, 0], orientation='horizontal', fraction=0.05, pad=0.02, label='log10(Δr [R_M])')
+        fig.colorbar(pcm_f, ax=axes[:, 1], orientation='horizontal', fraction=0.05, pad=0.02, label='log10(Flux [#/m²/s])')
+        out_png = os.path.join(out_dir, f"{case}_delta_r_flux_gridded_log.png")
+        fig.savefig(out_png, dpi=250)
+        plt.show()
 
 # =============================================================================
 # HEATMAP CORRELATION: Δr vs flux with latitude limited to ±75°
 # =============================================================================
 
-lat_mask = (lat_centers >= -75) & (lat_centers <= 75)
+lat_mask = (lat_centers >= DAY_LAT_MIN) & (lat_centers <= DAY_LAT_MAX)
+# lat_mask = (lat_centers >= -90) & (lat_centers <= 90)
 
-for case in cases:
-    fig, axes = plt.subplots(
-        nrows=len(selected_times), ncols=1, figsize=(6, 3*len(selected_times)), constrained_layout=True
-    )
-
-    for row, t_sel in enumerate(selected_times):
-        ax = axes[row] if len(selected_times) > 1 else axes
-
-        # select only the dayside longitudes and ±75° latitude
-        dr = all_delta_r[case][t_sel][lat_mask, :]
-        flux = all_flux[case][t_sel][lat_mask, :]
-
-        # log-transform for correlation
-        dr_log = np.log10(dr)
-        flux_log = np.log10(flux)
-
-        # flatten arrays and remove NaNs or -inf from log10
-        # valid = np.isfinite(dr_log) & np.isfinite(flux_log)
-        valid = np.isfinite(flux_log)
-        # dr_flat = dr_log[valid]
-        dr_flat = dr[valid]
-        flux_flat = flux_log[valid]
-
-        if dr_flat.size == 0:
-            print(f"Skipping {case} t={t_sel}s: no valid data in ±75° latitude")
-            continue
-
-        # 2D histogram
-        h = ax.hist2d(
-            dr_flat, flux_flat,
-            bins=[DR_BINS, 80],
-            cmap="cividis",
-            range=[[0.01, 0.75], [8, 14]]
+if 0:
+    for case in cases:
+        fig, axes = plt.subplots(
+            nrows=len(selected_times), ncols=1, figsize=(6, 3*len(selected_times)), constrained_layout=True
         )
 
-        # median trend
-        bins = np.linspace(0.01, 0.75, DR_BINS)
-        digitized = np.digitize(dr_flat, bins)
-        med = [np.nanmedian(flux_flat[digitized == i]) if np.any(digitized == i) else np.nan for i in range(1, len(bins))]
-        centers = 0.5 * (bins[:-1] + bins[1:])
-        ax.plot(centers, med, color='red', lw=2, label='median')
+        for row, t_sel in enumerate(selected_times):
+            ax = axes[row] if len(selected_times) > 1 else axes
 
-        ax.set_title(f"{case} t={t_sel:.1f}s")
-        ax.set_xlabel("Δr [R_M]")
-        ax.set_ylabel("log10(Flux [#/m²/s])")
-        ax.grid(alpha=0.3)
-        ax.legend()
+            # select only the dayside longitudes and ±75° latitude
+            dr = all_delta_r[case][t_sel][lat_mask, :]
+            flux = all_flux[case][t_sel][lat_mask, :]
 
-    fig.colorbar(h[3], ax=axes, orientation='vertical', fraction=0.02, pad=0.01, label='counts')
-    plt.show()
+            # log-transform for correlation
+            dr_log = np.log10(dr)
+            flux_log = np.log10(flux)
 
-lat_mask = (lat_centers >= -75) & (lat_centers <= 75)
+            # flatten arrays and remove NaNs or -inf from log10
+            # valid = np.isfinite(dr_log) & np.isfinite(flux_log)
+            valid = np.isfinite(flux_log)
+            # dr_flat = dr_log[valid]
+            dr_flat = dr[valid]
+            flux_flat = flux_log[valid]
+
+            if dr_flat.size == 0:
+                print(f"Skipping {case} t={t_sel}s: no valid data in ±75° latitude")
+                continue
+
+            # 2D histogram
+            h = ax.hist2d(
+                dr_flat, flux_flat,
+                bins=[DR_BINS, 80],
+                cmap="cividis",
+                range=[[1.0, 1.75], [8, 14]]
+            )
+
+            # median trend
+            bins = np.linspace(1.0, 1.75, DR_BINS)
+            digitized = np.digitize(dr_flat, bins)
+            med = [np.nanmedian(flux_flat[digitized == i]) if np.any(digitized == i) else np.nan for i in range(1, len(bins))]
+            centers = 0.5 * (bins[:-1] + bins[1:])
+            ax.plot(centers, med, color='red', lw=2, label='median')
+
+            ax.set_title(f"{case} t={t_sel:.1f}s")
+            ax.set_xlabel("Δr [R_M]")
+            ax.set_ylabel("log10(Flux [#/m²/s])")
+            ax.grid(alpha=0.3)
+            ax.legend()
+
+        fig.colorbar(h[3], ax=axes, orientation='vertical', fraction=0.02, pad=0.01, label='counts')
+        plt.show()
+
 
 fig, axes = plt.subplots(
     nrows=len(selected_times), ncols=len(cases),
-    figsize=(16, 12), constrained_layout=True, sharex=True, sharey=True
+    figsize=(12, 10), constrained_layout=True, sharex=True, sharey=True
 )
 
 for i, t_sel in enumerate(selected_times):
@@ -513,12 +516,12 @@ for i, t_sel in enumerate(selected_times):
             dr_flat, flux_flat,
             bins=[DR_BINS, 80],
             cmap="cividis",
-            range=[[0.01, 0.9], [8, 14]],
+            range=[[1.0, 1.9], [8.5, 14.5]],
             vmin=0, vmax=5
         )
 
         # median trend
-        bins = np.linspace(0.01, 0.9, DR_BINS)
+        bins = np.linspace(1.0, 1.9, DR_BINS)
         digitized = np.digitize(dr_flat, bins)
         med = [
             np.nanmedian(flux_flat[digitized == k]) if np.any(digitized == k) else np.nan
@@ -528,13 +531,17 @@ for i, t_sel in enumerate(selected_times):
         # ax.plot(centers, med, color='red', lw=2)
 
         # titles
-        ax.set_title(f"{case.split('_')[0]}  t={t_sel:.1f}s")
+        # panel label (a1, a2, ..., b1, b2, ...)
+        row_letter = chr(ord('a') + i)
+        panel_label = f"({row_letter}{j + 1})"
+
+        ax.set_title(f"{panel_label} {case.split('_')[0]}  t = {t_sel:.0f} s", fontsize=14, fontweight='bold')
 
         # labels only on outer panels
         if i == len(selected_times) - 1:
-            ax.set_xlabel("Δr [R_M]")
+            ax.set_xlabel("Δr [R$_M$]", fontsize=11)
         if j == 0:
-            ax.set_ylabel("log10(Flux [#/m²/s])")
+            ax.set_ylabel("log10(Flux [#/m²/s])", fontsize=11)
 
         ax.grid(alpha=0.3)
 
@@ -579,7 +586,7 @@ def draw_latlon_grid(ax):
         y = np.sin(lat_r)
 
         mask = np.cos(lat_r) * np.cos(lon_r) > 0
-        ax.plot(x[mask], y[mask], color="gray", lw=0.5, alpha=0.5)
+        ax.plot(x[mask], y[mask], color="silver", lw=0.5, alpha=0.5)
 
     # longitude labels
     for lon in np.arange(-60, 61, 30):
@@ -592,26 +599,28 @@ def draw_latlon_grid(ax):
         y = np.sin(np.radians(lat))
         ax.text(-1.05, y, f"{lat}°", ha="right", va="center", fontsize=8)
 
+
 # =============================================================================
-# CIRCULAR DAYSIDE PROJECTION (SUBSOLAR DISK) — LOG VERSION
+# CIRCULAR DAYSIDE PROJECTION (SUBSOLAR DISK) — ALL CASES / ALL TIMES
 # =============================================================================
 
-for case in cases:
-    fig, axes = plt.subplots(
-        nrows=4, ncols=2, figsize=(10,12),
-        constrained_layout=True
-    )
+fig, axes = plt.subplots(
+    nrows=len(selected_times),
+    ncols=len(cases),
+    figsize=(12, 10),
+    constrained_layout=True
+)
 
-    for row, t_sel in enumerate(selected_times):
+for i, t_sel in enumerate(selected_times):
+    for j, case in enumerate(cases):
 
-        ax_dr = axes[row,0]
-        ax_flux = axes[row,1]
+        ax = axes[i, j]
 
-        dr = np.log10(all_delta_r[case][t_sel])
-        flux = np.log10(all_flux[case][t_sel])
+        dr_log = np.log10(all_delta_r[case][t_sel][lat_mask, :])
 
         lon_day = lon_centers[(lon_centers >= DAY_LON_MIN) & (lon_centers <= DAY_LON_MAX)]
-        LAT, LON = np.meshgrid(lat_centers, lon_day, indexing="ij")
+        lat_day = lat_centers[(lat_centers >= DAY_LAT_MIN) & (lat_centers <= DAY_LAT_MAX)]
+        LAT, LON = np.meshgrid(lat_day, lon_day, indexing="ij")
 
         lat_r = np.radians(LAT)
         lon_r = np.radians(LON)
@@ -622,57 +631,133 @@ for case in cases:
 
         # Mask nightside
         mask = np.cos(lat_r) * np.cos(lon_r) > 0
+        dr_log_plot = np.where(mask, dr_log, np.nan)
 
-        dr_plot = np.where(mask, dr, np.nan)
-        flux_plot = np.where(mask, flux, np.nan)
-
-        pcm = ax_dr.pcolormesh(
-            X, Y, dr_plot,
+        pcm = ax.pcolormesh(
+            X, Y, dr_log_plot,
             shading="auto",
             cmap="viridis",
-            vmin=np.log10(0.01),
-            vmax=np.log10(0.75)
+            vmin=np.log10(1.0),
+            vmax=np.log10(1.6)
         )
 
-        pcm_f = ax_flux.pcolormesh(
-            X, Y, flux_plot,
-            shading="auto",
-            cmap="plasma",
-            vmin=np.log10(1e8),
-            vmax=np.log10(1e14)
+        ax.set_aspect("equal")
+        ax.set_xlim(-1,1)
+        ax.set_ylim(-1,1)
+        ax.axis("off")
+
+        # draw dayside boundary
+        circle = plt.Circle((0,0),1, color="black", fill=False, lw=1.2)
+        ax.add_patch(circle)
+
+        draw_latlon_grid(ax)
+
+        # panel label
+        row_letter = chr(ord('a') + i)
+        panel_label = f"({row_letter}{j+1})"
+
+        ax.set_title(
+            f"{panel_label} {case.split('_')[0]}  t = {t_sel:.0f} s",
+            fontsize=14, fontweight='bold'
         )
 
-        for ax in (ax_dr, ax_flux):
-            ax.set_aspect("equal")
-            ax.set_xlim(-1,1)
-            ax.set_ylim(-1,1)
-            ax.axis("off")
+# shared colorbar
+fig.colorbar(
+    pcm,
+    ax=axes,
+    orientation="vertical",
+    fraction=0.02,
+    pad=0.01,
+    label="log10(Δr [R$_M$])"
+)
 
-            # draw dayside boundary
-            circle = plt.Circle((0,0),1,color="black",fill=False,lw=1)
-            ax.add_patch(circle)
+out_png = os.path.join(out_dir, "all_cases_dayside_disk_projection_log.png")
+fig.savefig(out_png, dpi=250)
 
-            draw_latlon_grid(ax)
+plt.show()
 
-        ax_dr.set_title(f"{case.split('_')[0]} log10(Δr) t={t_sel:.1f}s")
-        ax_flux.set_title(f"{case.split('_')[0]} log10(flux) t={t_sel:.1f}s")
+if 0:
+    # =============================================================================
+    # CIRCULAR DAYSIDE PROJECTION (SUBSOLAR DISK) — LOG VERSION
+    # =============================================================================
 
-    fig.colorbar(
-        pcm, ax=axes[:,0],
-        orientation="horizontal",
-        fraction=0.05,
-        pad=0.05,
-        label="log10(Δr [R_M])"
-    )
+    for case in cases:
+        fig, axes = plt.subplots(
+            nrows=4, ncols=2, figsize=(10,12),
+            constrained_layout=True
+        )
 
-    fig.colorbar(
-        pcm_f, ax=axes[:,1],
-        orientation="horizontal",
-        fraction=0.05,
-        pad=0.05,
-        label="log10(Flux [#/m²/s])"
-    )
+        for row, t_sel in enumerate(selected_times):
 
-    out_png = os.path.join(out_dir, f"{case}_dayside_disk_projection_log.png")
-    fig.savefig(out_png, dpi=250)
-    plt.show()
+            ax_dr = axes[row,0]
+            ax_flux = axes[row,1]
+
+            dr = np.log10(all_delta_r[case][t_sel])
+            flux = np.log10(all_flux[case][t_sel])
+
+            lon_day = lon_centers[(lon_centers >= DAY_LON_MIN) & (lon_centers <= DAY_LON_MAX)]
+            LAT, LON = np.meshgrid(lat_centers, lon_day, indexing="ij")
+
+            lat_r = np.radians(LAT)
+            lon_r = np.radians(LON)
+
+            # Orthographic projection centered on subsolar point
+            X = np.cos(lat_r) * np.sin(lon_r)
+            Y = np.sin(lat_r)
+
+            # Mask nightside
+            mask = np.cos(lat_r) * np.cos(lon_r) > 0
+
+            dr_plot = np.where(mask, dr, np.nan)
+            flux_plot = np.where(mask, flux, np.nan)
+
+            pcm = ax_dr.pcolormesh(
+                X, Y, dr_plot,
+                shading="auto",
+                cmap="viridis",
+                vmin=np.log10(1.0),
+                vmax=np.log10(1.75)
+            )
+
+            pcm_f = ax_flux.pcolormesh(
+                X, Y, flux_plot,
+                shading="auto",
+                cmap="plasma",
+                vmin=np.log10(1e8),
+                vmax=np.log10(1e14)
+            )
+
+            for ax in (ax_dr, ax_flux):
+                ax.set_aspect("equal")
+                ax.set_xlim(-1,1)
+                ax.set_ylim(-1,1)
+                ax.axis("off")
+
+                # draw dayside boundary
+                circle = plt.Circle((0,0),1,color="black",fill=False,lw=1)
+                ax.add_patch(circle)
+
+                draw_latlon_grid(ax)
+
+            ax_dr.set_title(f"{case.split('_')[0]} log10(Δr) t={t_sel:.1f}s")
+            ax_flux.set_title(f"{case.split('_')[0]} log10(flux) t={t_sel:.1f}s")
+
+        fig.colorbar(
+            pcm, ax=axes[:,0],
+            orientation="horizontal",
+            fraction=0.05,
+            pad=0.05,
+            label="log10(Δr [R_M])"
+        )
+
+        fig.colorbar(
+            pcm_f, ax=axes[:,1],
+            orientation="horizontal",
+            fraction=0.05,
+            pad=0.05,
+            label="log10(Flux [#/m²/s])"
+        )
+
+        out_png = os.path.join(out_dir, f"{case}_dayside_disk_projection_log.png")
+        fig.savefig(out_png, dpi=250)
+        plt.show()
