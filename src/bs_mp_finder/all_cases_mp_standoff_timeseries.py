@@ -96,7 +96,7 @@ for i, case in enumerate(cases):
             f"Magnetic Equator (+{lat_mag_fixed:.1f}°)"
         ]
 
-    ax.set_title(case.replace("_", " "), fontsize=14, fontweight="bold")
+    ax.set_title(case.split("_")[0], fontsize=14, fontweight="bold")
     ax.grid(True)
 
 # ============================================================

@@ -442,7 +442,6 @@ fig.align_ylabels()
 plt.suptitle("Alpha precipitation statistics vs time", fontsize=16, fontweight="bold")
 plt.tight_layout(rect=[0, 0.05, 1, 1])
 
-plt.tight_layout(rect=[0, 0.05, 1, 1])
 out_png = os.path.join(base_dir, "all_cases_alpha_precip_stats.png")
 plt.savefig(out_png, dpi=300)
 plt.show()

@@ -55,7 +55,7 @@ lat_centers = 0.5 * (lat_bin_edges[:-1] + lat_bin_edges[1:])
 lon_centers = 0.5 * (lon_bin_edges[:-1] + lon_bin_edges[1:])
 
 DAY_LON_MIN, DAY_LON_MAX = -75, 75  # dayside longitude for correlation
-DAY_LAT_MIN, DAY_LAT_MAX = -90, 90
+DAY_LAT_MIN, DAY_LAT_MAX = -65, 65
 
 V_cell = sim_dx * sim_dy * sim_dz
 W_by_sid = flux_utils.macro_weights(sim_den, sim_ppc, V_cell)
@@ -555,7 +555,7 @@ fig.colorbar(
     label='counts'
 )
 
-out_png = os.path.join(out_dir, f"all_cases_delta_r_fluxlog_correlation.png")
+out_png = os.path.join(out_dir, f"all_cases_delta_r_fluxlog_correlation_lat{DAY_LAT_MIN}—{DAY_LAT_MAX}.png")
 fig.savefig(out_png, dpi=250)
 plt.show()
 
@@ -671,7 +671,7 @@ fig.colorbar(
     label="log10(Δr [R$_M$])"
 )
 
-out_png = os.path.join(out_dir, "all_cases_dayside_disk_projection_log.png")
+out_png = os.path.join(out_dir, f"all_cases_dayside_disk_projection_log_lat{DAY_LAT_MIN}—{DAY_LAT_MAX}.png")
 fig.savefig(out_png, dpi=250)
 
 plt.show()
